@@ -1,6 +1,7 @@
 # PPM-PXX R9M Relay
 
 RC Relay takes signal from PPM receiver and sends it to FrSky R9M module. 
+The project was inspired by [PPMtoPXXArduino](https://github.com/MichaelCWarren/PPMtoPXXArduino) project from where I borrowed most of CPPM and PXX handling code.
 
 ## Features
 
@@ -28,7 +29,7 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 * Saleae8 Logic Analyzer + Logic application;
 * SDR Radio dongle + SDR Sharp application;
 * Horus transmitter;
-* Custom [link](/tools/readme.md "scripts")  from *tools* folder;
+* Custom [scripts](tools/readme.md) from *tools* folder;
 
 ## Parts list
 
@@ -40,7 +41,7 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 
 ## Arduino libraries used
 
-* [link](https://github.com/olikraus/u8g2 "U8g2lib")
+* [U8g2lib](https://github.com/olikraus/u8g2 "U8g2lib")
 
 ## Custom libraries created (suitable for reuse)
 
@@ -49,14 +50,14 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 * BatteryMonitor (.h, .cpp) - provides voltage monitoring, cells count detection and low voltage alarms;
 
 ## Images
-![Connections](/docs/all_connections.PNG "All circuit connections")
+![Connections](docs/all_connections.PNG "All circuit connections")
 
-![MOSFET connection](/docs/MOSFET.PNG "MOSFET connection")
+![MOSFET connection](docs/MOSFET.PNG "MOSFET connection")
 
-![R9M power consumption in Horus transmitter](/docs/R9M_power_consumption.PNG "R9M Power consumption")
+![R9M power consumption in Horus transmitter](docs/R9M_power_consumption.PNG "R9M Power consumption")
 
-![R9M pinout](/docs/R9M_pinout.PNG "R9M pinout")
+![R9M pinout](docs/R9M_pinout.PNG "R9M pinout")
 
-![PXX sample packets](/docs/PXX_capture.PNG "PXX sample packets")
+![PXX sample packets](docs/PXX_capture.PNG "PXX sample packets")
 
-![SPort sample packets](/docs/R9M_SPort_capture.PNG "SPort sample packets")
+![SPort sample packets](docs/R9M_SPort_capture.PNG "SPort sample packets")
