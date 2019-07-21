@@ -1,6 +1,7 @@
 # PPM-PXX R9M Relay
 
-RC Relay takes signal from PPM receiver and sends it to FrSky R9M module. 
+RC Relay takes PPM signal from receiver and sends it to FrSky R9M module via PXX protocol. It supports up to 8 channels due to PPM protocol limitations.
+
 The project was inspired by [PPMtoPXXArduino](https://github.com/MichaelCWarren/PPMtoPXXArduino) project from where I borrowed most of CPPM and PXX handling code.
 
 ## Features
@@ -16,7 +17,7 @@ It provides full featured control of R9M:
 
 Has channel monitor, voltage monitor with cell count detection, CPPM lost detection.
 Provides distinctive sound signals for everything: menu buttons, low voltage, etc.
-Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MOSFET, 2 resistors and breadboard.
+Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MOSFET, 4 resistors and breadboard.
 
 ## Tools needed to build
 
