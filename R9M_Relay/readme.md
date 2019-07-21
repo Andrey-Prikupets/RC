@@ -23,11 +23,12 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 * Arduino environment 1.8.9;
 * parts (see parts list below);
 * soldering iron;
+* "Dremel" kind rotary tool to make a case;
 
 ## Additional tools used during debugging
 
-* Saleae8 Logic Analyzer + Logic application;
-* SDR Radio dongle + SDR Sharp application;
+* Saleae8 Logic Analyzer + Logic application to see PXX, PPM, CPPM signals;
+* SDR Radio dongle + SDR Sharp application to monitor transmission frequency (EU 860-868 MHz, US 900-930 MHz);
 * Horus transmitter;
 * Custom [scripts](tools/readme.md) from *tools* folder;
 
@@ -36,8 +37,10 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 * Arduino Nano (328p, 5V);
 * SSD1306 OLED screen (64x48, I2C);
 * Any logical level p-channel MOSFET (up to 1A current), i.e. IRF9Z14; it is used to disable R9M by cutting its power off;
-* Resistors 680 Ohm and 10 kOhm;
+* Resistors 680 Ohm, 10 kOhm for voltage divider and 180 Ohm, 10 kOhm for MOSFET;
+* 2 small pushbuttons;
 * 5V BEC up to 1-2A current;
+* breadboard, R9M connectors, battery connector (XT60), suitable case;
 
 ## Arduino libraries used
 
