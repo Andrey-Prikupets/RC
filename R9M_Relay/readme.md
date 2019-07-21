@@ -21,7 +21,7 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 ## Tools needed to build
 
 * Arduino environment 1.8.9;
-* parts
+* parts (see parts list below);
 * soldering iron;
 
 ## Additional tools used during debugging
@@ -50,14 +50,21 @@ Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MO
 * BatteryMonitor (.h, .cpp) - provides voltage monitoring, cells count detection and low voltage alarms;
 
 ## Images
-![Connections](docs/all_connections.PNG "All circuit connections")
 
-![MOSFET connection](docs/MOSFET.PNG "MOSFET connection")
+### All circuit connections
+![Connections](docs/all_connections.PNG)
 
-![R9M power consumption in Horus transmitter](docs/R9M_power_consumption.PNG "R9M Power consumption")
+### MOSFET connection
+![MOSFET connection](docs/MOSFET.PNG)
 
-![R9M pinout](docs/R9M_pinout.PNG "R9M pinout")
+### R9M Power consumption in Horus transmitter
+![R9M power consumption in Horus transmitter](docs/R9M_power_consumption.PNG)
 
-![PXX sample packets](docs/PXX_capture.PNG "PXX sample packets")
+### R9M pinout
+![R9M pinout](docs/R9M_pinout.PNG)
 
-![SPort sample packets](docs/R9M_SPort_capture.PNG "SPort sample packets")
+### PXX sample packets
+![PXX sample packets](docs/PXX_capture.PNG)
+
+### SPort sample packets
+![SPort sample packets](docs/R9M_SPort_capture.PNG)
