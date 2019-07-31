@@ -8,6 +8,8 @@
 #include "BatteryMonitor.h"
 #include "debug.h"
 
+#define VERSION "PPM-PXX 01" // NOTE: No more than 10 characters for 64x48 OLED display!
+
 // Configurable parameters;
 #define MAX_RX_NUM 10 // Up to 255(?), but bigger number requires longer scrolling through RX number menu;
 #define BOUNCE_TICK 30 // Delay for keypress settling;
@@ -37,6 +39,7 @@ extern const uint8_t TIMER_BATTERY_SCREEN;
 extern const uint8_t TIMER_NO_CPPM;
 extern const uint8_t TIMER_CHANNELS_SCREEN;
 extern const uint8_t TIMER_INVALID_FLASHING;
+extern const uint8_t TIMER_CHANNELS_MIN_MAX_FLIP;
 
 extern Seq SEQ_MODE_RANGE_CHECK;
 extern Seq SEQ_MODE_BIND;
@@ -47,5 +50,11 @@ extern Seq SEQ_MODE_CPPM_LOST;
 extern Seq SEQ_MODE_GOT_CPPM;
 
 extern bool channelValid(int16_t x);
+
+extern bool channelsMinMaxSet;
+extern bool cppmActive;
+extern int16_t channels[16];
+extern int16_t channelsMin[16];
+extern int16_t channelsMax[16];
 
 #endif // MENU_H

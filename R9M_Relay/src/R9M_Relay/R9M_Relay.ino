@@ -50,9 +50,10 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 // 5  8s      Battery low alert sound;
 // 6  4s      Battery min alert sound;
 // 7  4s      Screensaver out of menu delay;
-// 8  250ms   Channels update;
+// 8  200ms   Channels update;
 // 9  500ms   Invalid channels flashing;
-TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 250, 500};
+//10  2000ms  Channels Min/Max page flip;
+TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000};
 MultiTimer timer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
 const uint8_t TIMER_MENU_FLASHING    = 0;
@@ -65,6 +66,7 @@ const uint8_t TIMER_BATTERY_MIN      = 6;
 const uint8_t TIMER_SCREENSAVER      = 7;
 const uint8_t TIMER_CHANNELS_SCREEN  = 8;
 const uint8_t TIMER_INVALID_FLASHING = 9;
+const uint8_t TIMER_CHANNELS_MIN_MAX_FLIP = 10;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
@@ -135,13 +137,41 @@ void updateVoltageMonitor() {
   }  
 }
 
-static int16_t channels[16] = { 1500,1500,1000,1500,1200,1400,1600,1800, 1000,1000,1000,1000,1000,1000,1000,1000};
+int16_t channels[16] = { 1500,1500,1000,1500,1200,1400,1600,1800, 1000,1000,1000,1000,1000,1000,1000,1000};
 static byte missed_frames = 0;
+
+bool channelsMinMaxSet = false; 
+static uint8_t channelsMinMaxLock = 50; // Skip first channel values (they might be unstable); 
+int16_t channelsMin[16];
+int16_t channelsMax[16];
+bool cppmActive = false;
 
 extern bool channelValid(int16_t x);
 
 bool channelValid(int16_t x) {
     return (x >= MIN_SERVO_US && x <= MAX_SERVO_US);
+}
+
+void updateChannelsMinMax() {
+    if (!channelsMinMaxSet) {
+     if (channelsMinMaxLock > 0) {
+        channelsMinMaxLock--;
+        return;
+      }
+      channelsMinMaxSet = true;
+      memcpy(channelsMin, channels, sizeof(channelsMin));
+      memcpy(channelsMax, channels, sizeof(channelsMin));
+    } else {
+      for(uint8_t i = 0; i < 8; i++) {
+        int16_t x = channels[i];
+        if (channelsMin[i] > x) {
+          channelsMin[i] = x;  
+        }
+        if (channelsMax[i] < x) {
+          channelsMax[i] = x;  
+        }
+      }
+    }
 }
 
 void doPrepare(bool reset_frames) {
@@ -162,23 +192,28 @@ void loop() {
            doPrepare(true);
         } else {
           CPPM.cycle();
-          bool cppmIsValid = CPPM.synchronized();
+          bool cppmIsValid = cppmActive = CPPM.synchronized();
           if (cppmIsValid) {
-              for(int i = 0; i < 7; i++) {
+              for(uint8_t i = 0; i < 8; i++) {
                   int16_t x = channels[i] = CPPM.read_us(i);
                   if (!channelValid(x)) {
                     cppmIsValid = false; 
                   } 
               }
+              updateChannelsMinMax();
           }
           if (cppmIsValid) {
               doPrepare(true);
               setCPPM_Obtained();
+#ifndef DEBUG
               digitalWrite(R9M_POWER_PIN, R9M_POWER_ON);
+#endif
           } else {
               doPrepare(false);            
           }
         }
+
+        menuLoop();        
     } else {
         if (missed_frames < MAX_ALLOWED_MISSED_FRAMES) {
 #ifndef DEBUG
@@ -190,17 +225,19 @@ void loop() {
           missed_frames++;
         } else {
           setCPPM_Lost();
+#ifndef DEBUG
           digitalWrite(R9M_POWER_PIN, R9M_POWER_OFF);
+#endif
         }
     }
-
-    prepare = !prepare;
-
-    menuLoop();
+    
     beeper1.loop();    
     if (timer1.isTriggered(TIMER_BATTERY_LOOP)) {
       battery1.loop();
       updateVoltageMonitor();
     }
+
+    prepare = !prepare;
+
     delay(2); // 2+2 ms additional pause between PXX packets;
 }

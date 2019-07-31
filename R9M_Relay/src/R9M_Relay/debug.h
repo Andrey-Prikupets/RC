@@ -7,3 +7,5 @@
 #endif
 
 // #define SIMULATE_CHANNELS
+
+//#define SOUND_OFF

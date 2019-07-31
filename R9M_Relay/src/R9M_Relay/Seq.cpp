@@ -51,8 +51,12 @@ void Beeper::removeFromQueue(uint8_t position) {
 }
 
 void Beeper::beep(bool enable) {
-	isBeeping = enable;
-	digitalWrite(pin, pinIsInverted != enable);
+#ifdef SOUND_OFF  
+  isBeeping = false;
+#else
+  isBeeping = enable;
+#endif
+	digitalWrite(pin, pinIsInverted != isBeeping);
 }
 
 void Beeper::removeIfNotPlayed(uint8_t seqIndex) {
