@@ -53,22 +53,31 @@ bool cppmModeChanged(void);
 byte radioMode;
 
 // PROGMEM enabled draw functions -----------------------
-static char buf_P[10];
-#define PBUF(s) strcpy_P(buf_P, s)
-
-void drawStr_P(uint8_t x, uint8_t y, const char * s_P) {
-  const char * s1 = PBUF(s_P);
-  u8g.drawStr(x, y, s1);         
+size_t getLength_F(const __FlashStringHelper *ifsh)
+{
+  PGM_P p = reinterpret_cast<PGM_P>(ifsh);
+  size_t n = 0;
+  while (1) {
+    unsigned char c = pgm_read_byte(p++);
+    if (c == 0) break;
+    n++;
+  }
+  return n;
 }
 
-void drawStrRight_P(uint8_t x, uint8_t y, const char * s_P) {
-  const char * s1 = PBUF(s_P);
-  u8g.drawStr((uint8_t) u8g.getWidth()-u8g.getStrWidth(s1), y, s1);         
+void drawStr_F(uint8_t x, uint8_t y, const __FlashStringHelper* s_P) {
+  u8g.setCursor(x, y);
+  u8g.print(s_P);
 }
 
-void drawCentered_P(int y, char* s_P) {
-  const char * s1 = PBUF(s_P);
-  u8g.drawStr((u8g.getWidth()-u8g.getStrWidth(s1))/2, y, s1);     
+void drawStrRight_F(uint8_t x, uint8_t y, const __FlashStringHelper* s_P) {
+  u8g.setCursor((uint8_t) u8g.getWidth()-x-getLength_F(s_P)*u8g.getStrWidth("W"), y);
+  u8g.print(s_P);
+}
+
+void drawCentered_F(int y, const __FlashStringHelper* s_P) {
+  u8g.setCursor((u8g.getWidth()-(getLength_F(s_P)+1)*u8g.getStrWidth("W"))/2, y);     
+  u8g.print(s_P);
 }
 
 // Keyboard handling -----------------------------------
@@ -101,7 +110,7 @@ uint8_t handleKeys(void) {
 #define MENU_LEFT 0
 #define MENU_TOP 0
 
-void drawMenuItem(uint8_t i, const char * s_P, const char * s1) {
+void drawMenuItem(uint8_t i, const __FlashStringHelper* s_P, const char * s1) {
     uint8_t y;
     uint8_t screen_width = (uint8_t) u8g.getWidth();
     uint8_t char_height = u8g.getFontAscent()-u8g.getFontDescent();
@@ -112,53 +121,54 @@ void drawMenuItem(uint8_t i, const char * s_P, const char * s1) {
       u8g.setDrawColor(0);
     }
     if (s_P) {
-      drawStr_P(MENU_LEFT+1, y-1, s_P);
+      u8g.setCursor(MENU_LEFT+1, y-1);
+      u8g.print(s_P);
     }
     if (s1) {
       u8g.drawStr(screen_width-u8g.getStrWidth(s1), y-1, s1);      
     }
 }
 
-char* getPowerStr(void) {
+const __FlashStringHelper* getPowerStr(void) {
   if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
     switch (PXX.getPower()) {
-  case 0: return PSTR("10 mW");
+  case 0: return F("10 mW");
        break;
-  case 1: return PSTR("100 mW");
+  case 1: return F("100 mW");
        break;
-  case 2: return PSTR("500 mW");
+  case 2: return F("500 mW");
        break;
-  case 3: return PSTR("Auto < 1 W");
+  case 3: return F("Auto < 1 W");
        break;
     }
   } else {
     switch (PXX.getPower()) {
-  case 0: return PSTR("25 mW 8ch");
+  case 0: return F("25 mW 8ch");
        break;
-  case 1: return PSTR("25 mW");
+  case 1: return F("25 mW");
        break;
-  case 2: return PSTR("200 mW");
+  case 2: return F("200 mW");
        break;
-  case 3: return PSTR("500 mW");
+  case 3: return F("500 mW");
        break;
     }    
   }
   return NULL;
 }
 
-char* getBandStr(void) {
+const __FlashStringHelper* getBandStr(void) {
   switch(radioMode) {
-    case RADIO_US_FCC: return PSTR("US FCC 915MHz");
-    case RADIO_EU_LBT: return PSTR("EU LBT 868MHz");
-    default:           return PSTR("FLEX   868MHz"); // RADIO_EU_FLEX
+    case RADIO_US_FCC: return F("US FCC 915MHz");
+    case RADIO_EU_LBT: return F("EU LBT 868MHz");
+    default:           return F("FLEX   868MHz"); // RADIO_EU_FLEX
   }
 }
 
-char* getBandStrShort(void) {
+const __FlashStringHelper* getBandStrShort(void) {
   switch(radioMode) {
-    case RADIO_US_FCC: return PSTR("US 915");
-    case RADIO_EU_LBT: return PSTR("EU 868");
-    default:           return PSTR("FLEX 868"); // RADIO_EU_FLEX
+    case RADIO_US_FCC: return F("US 915");
+    case RADIO_EU_LBT: return F("EU 868");
+    default:           return F("FLEX 868"); // RADIO_EU_FLEX
   }
 }
 
@@ -175,9 +185,9 @@ void drawMenu(void) {
 #ifdef DEBUG
   Serial.print("drawMenu="); Serial.println(menu_current);
 #endif  
-  drawMenuItem(0, PSTR("Radio Set."), NULL);
-  drawMenuItem(1, PSTR("RX Monitor"), NULL);
-  drawMenuItem(2, PSTR("RX Min/Max"), NULL);
+  drawMenuItem(0, F("Radio Set."), NULL);
+  drawMenuItem(1, F("RX Monitor"), NULL);
+  drawMenuItem(2, F("RX Min/Max"), NULL);
 }
 
 static bool invalidValueFlashing = false;
@@ -191,7 +201,7 @@ int16_t getChannel_Raw_Min_Max(uint8_t channel) {
 void drawChannelItems(uint8_t i, uint8_t channelLeft, uint8_t channelRight) {
   uint8_t screen_width = (uint8_t) u8g.getWidth();
   uint8_t char_height = u8g.getFontAscent()-u8g.getFontDescent()+1;
-  uint8_t char_width = u8g.getStrWidth("8");
+  uint8_t char_width = u8g.getStrWidth("W");
   char buf[7];
   int y = MENU_TOP+char_height*i;
 
@@ -234,7 +244,7 @@ void drawChannels(void) {
   }
   
   if (menuMode == MODE_CHANNELS && !cppmActive) {
-    drawStr_P(MENU_LEFT, MENU_TOP, PSTR("No CPPM")); 
+    drawStr_F(MENU_LEFT, MENU_TOP, F("No CPPM")); 
     // Errs: NNN
     // Fail: 1
   } else {
@@ -271,7 +281,6 @@ void drawChannels(void) {
 
 void drawMenuRadio(void) {
   prepareForDrawing(false);
-
   drawMenuItem(0, getBandStr(), NULL);
 
   char buf[5];
@@ -280,12 +289,12 @@ void drawMenuRadio(void) {
   drawMenuItem(1, getPowerStr(), buf);
   
   itoa(PXX.getRxNum(), buf, 10);
-  drawMenuItem(2, PSTR("Receiver"), buf);
+  drawMenuItem(2, F("Receiver"), buf);
   
-  drawMenuItem(3, PSTR("TELEM "), PXX.getTelemetry() ? "Yes" : "No");
-  drawMenuItem(4, PSTR("S-Port "), PXX.getSPort() ? "Yes" : "No");
-  drawMenuItem(5, !PXX.getModeRangeCheck() || menuItemFlashing ? PSTR(">RANGE CHECK") : NULL, NULL);
-  drawMenuItem(6, !PXX.getModeBind() || menuItemFlashing ? PSTR(">BIND") : NULL, NULL);  
+  drawMenuItem(3, F("TELEM "), PXX.getTelemetry() ? "Yes" : "No");
+  drawMenuItem(4, F("S-Port "), PXX.getSPort() ? "Yes" : "No");
+  drawMenuItem(5, !PXX.getModeRangeCheck() || menuItemFlashing ? F(">RANGE CHECK") : NULL, NULL);
+  drawMenuItem(6, !PXX.getModeBind() || menuItemFlashing ? F(">BIND") : NULL, NULL);  
 }
 
 void drawScreenSaver() {
@@ -294,37 +303,37 @@ void drawScreenSaver() {
   uint8_t screen_width = (uint8_t) u8g.getWidth();
   uint8_t char_height = u8g.getFontAscent()-u8g.getFontDescent()+1;
   int y = MENU_TOP;
-  drawStr_P(MENU_LEFT, y, PSTR("Batt:")); 
+  drawStr_F(MENU_LEFT, y, F("Batt:")); 
   char buf[5];
   dtostrf(battery1.getCurrVoltage(), 4, 1, buf);
   u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
   y += char_height;
 
-  drawStr_P(MENU_LEFT, y, PSTR("Cells:")); 
+  drawStr_F(MENU_LEFT, y, F("Cells:")); 
   itoa(battery1.getNumCells(), buf, 10);
   u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);      
   y += char_height;
 
-  const char* s;
+  const __FlashStringHelper* s;
   switch (cppm_state) {
-  case CPPM_START: s = PSTR("CPPM: Wait");
+  case CPPM_START: s = F("CPPM: Wait");
        break;
-  case CPPM_LOST: s = PSTR("CPPM: Lost");
+  case CPPM_OBTAINED: s = F("CPPM: OK");
        break;
-  case CPPM_OBTAINED: s = PSTR("CPPM: OK");
+  default: s = F("CPPM: Lost"); // CPPM_LOST
        break;
   }
-  drawStr_P(MENU_LEFT, y, s); 
+  drawStr_F(MENU_LEFT, y, s); 
   if (CPPM.getFailReason()) {
     itoa(CPPM.getFailReason(), buf, 10);
     u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);          
   }
   y += char_height;
   
-  drawStr_P(MENU_LEFT, y, getBandStrShort()); 
+  drawStr_F(MENU_LEFT, y, getBandStrShort()); 
   y += char_height;
 
-  drawStr_P(MENU_LEFT, y, getPowerStr()); 
+  drawStr_F(MENU_LEFT, y, getPowerStr()); 
 }
 
 void drawLogo(void) {
@@ -336,14 +345,14 @@ void drawLogo(void) {
   u8g.drawBox(MENU_LEFT, MENU_TOP, u8g.getWidth()-MENU_LEFT, char_height*2+1);
 
   u8g.setDrawColor(0);
-  drawCentered_P(MENU_TOP+char_height*0, PSTR(VERSION));   
-  drawCentered_P(MENU_TOP+char_height*1, PSTR("R9M relay"));
+  drawCentered_F(MENU_TOP+char_height*0, F(VERSION));   
+  drawCentered_F(MENU_TOP+char_height*1, F("R9M relay"));
 
   u8g.setDrawColor(1);      
   uint8_t y = MENU_TOP+char_height*2+(MENU_TOP+char_height/2);
-  drawCentered_P(y, PSTR("(c) 2019"));   
-  drawCentered_P(y+char_height*1, PSTR("by Andrey"));
-  drawCentered_P(y+char_height*2, PSTR("Prikupets"));
+  drawCentered_F(y, F("(c) 2019"));   
+  drawCentered_F(y+char_height*1, F("by Andrey"));
+  drawCentered_F(y+char_height*2, F("Prikupets"));
 }
 
 void write_settings(void);

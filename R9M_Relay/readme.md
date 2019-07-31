@@ -15,7 +15,7 @@ It provides full featured control of R9M:
 * telemetry and S.Port switches;
 * enables 'No Pulses' as a most efficient type of fail-safe;
 
-Has channel monitor, voltage monitor with cell count detection, CPPM lost detection.
+Has channel monitor (it shows current channel values and minimum/maximum per channel), voltage monitor with cell count detection, CPPM lost detection.
 Provides distinctive sound signals for everything: menu buttons, low voltage, etc.
 Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MOSFET, 4 resistors and breadboard.
 
