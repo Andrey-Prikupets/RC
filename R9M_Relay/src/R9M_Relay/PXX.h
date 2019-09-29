@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "debug.h"
+#include "Seq.h"
 
 #define FAILSAFE_FRAME_EACH 1000
 
@@ -97,5 +98,10 @@ class PXX_Class
 };
 
 extern PXX_Class PXX;
+
+#ifdef BEEP_FAILSAFE
+extern Beeper beeper1;
+extern Seq SEQ_FAILSAFE;
+#endif
 
 #endif

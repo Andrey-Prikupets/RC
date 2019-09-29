@@ -38,8 +38,16 @@ NEW_SEQ (SEQ_BATTERY_4S,        BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE
 NEW_SEQ (SEQ_BATTERY_LOW,       BEEP_MS(200), PAUSE_MS(200), BEEP_MS(400), PAUSE_MS(200));
 NEW_SEQ (SEQ_BATTERY_MIN,       BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(200));
 
+#ifdef BEEP_FAILSAFE
+NEW_SEQ (SEQ_FAILSAFE,          BEEP_MS(50));
+#endif
+
 Seq* seqs[] = {&SEQ_KEY_NEXT, &SEQ_KEY_SELECT, &SEQ_MODE_RANGE_CHECK, &SEQ_MODE_BIND, &SEQ_MODE_CPPM_LOST, &SEQ_MODE_NO_CPPM, &SEQ_MODE_GOT_CPPM, &SEQ_MODE_CPPM_MISSED,
-               &SEQ_BATTERY_1S, &SEQ_BATTERY_2S, &SEQ_BATTERY_3S, &SEQ_BATTERY_4S, &SEQ_BATTERY_LOW, &SEQ_BATTERY_MIN};
+               &SEQ_BATTERY_1S, &SEQ_BATTERY_2S, &SEQ_BATTERY_3S, &SEQ_BATTERY_4S, &SEQ_BATTERY_LOW, &SEQ_BATTERY_MIN
+#ifdef BEEP_FAILSAFE
+               , &SEQ_FAILSAFE
+#endif               
+               };
 Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Seq*));
 
 // 0  500ms   Menu flashing;
@@ -190,6 +198,9 @@ void loop() {
     if(prepare) {
         if (PXX.getModeBind()) { // AP; send PXX if BIND pressed;
            doPrepare(true);
+#ifndef DEBUG
+           digitalWrite(R9M_POWER_PIN, R9M_POWER_ON); // Power R9M during BIND regardless of CPPM state;
+#endif
         } else {
           CPPM.cycle();
           bool cppmIsValid = cppmActive = CPPM.synchronized();

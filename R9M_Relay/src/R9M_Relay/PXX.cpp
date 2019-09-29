@@ -192,6 +192,9 @@ void PXX_Class::prepare(int16_t channels[16])
     putPcmByte(0);
 
     if (failsafe) {
+#ifdef BEEP_FAILSAFE      
+        beeper1.play(&SEQ_FAILSAFE);
+#endif
         // Send No Pulses failsafe setting;
         if (!sendUpperChannels) { // all channels 1-8 have 0;
           for (int i=0; i<12; i++) {

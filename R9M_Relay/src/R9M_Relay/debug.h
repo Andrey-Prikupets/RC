@@ -9,3 +9,5 @@
 // #define SIMULATE_CHANNELS
 
 //#define SOUND_OFF
+
+//#define BEEP_FAILSAFE
