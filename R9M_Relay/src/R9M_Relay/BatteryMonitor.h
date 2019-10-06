@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <stdint.h>
+#include "config.h"
 #include "debug.h"
 
 const float MAX_CELL_VOLTAGE = 4.2f;

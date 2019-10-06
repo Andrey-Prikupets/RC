@@ -33,12 +33,14 @@
 #define PXX_DISABLE_S_PORT     1 << 5
 #define PXX_R9M_EUPLUS         1 << 6 
 
+#define NUM_CHANNELS_PXX       16
+
 class PXX_Class
 {
     public:
         void begin();
         void send();
-        void prepare(int16_t channels[16]); 
+        void prepare(int16_t channels[NUM_CHANNELS_PXX]); 
 
         bool getModeBind() { return modeBind; }
         void setModeBind(bool value) { modeBind = value; refreshFlag1(); }

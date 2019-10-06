@@ -4,10 +4,7 @@
 
 #ifdef DEBUG
 //#define DEBUG_BATTERY
+//#define DEBUG_RELAY
 #endif
 
 // #define SIMULATE_CHANNELS
-
-//#define SOUND_OFF
-
-//#define BEEP_FAILSAFE
