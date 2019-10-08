@@ -415,15 +415,26 @@ void CPPM_Class::write_us(int n, int v) // +2015-04-01
 void CPPM_Class::enableOutput(boolean enable) {
   if (enable == outputEnabled)
     return;
-    
+
+  outputEnabled = enable;
   // enable or disable CPPM timer;  
+  cli();
   digitalWrite(CPPM_OC1A, HIGH);
   if (enable) {
-    OCR1A = TCNT0; // init the Output Compare Register
     TCCR1A = (1<<COM1A0);  // Toggle OC1A/OC1B on Compare Match.
+    CPPM.oservo = 0;
+    // start CPPM frame after 22ms...
+    OCR1A += CPPM_T_round(R615X_FRAME_LENGTH);
+
+    // Enable Timer1 output compare interrupt...
+    bitSet(TIFR1, OCF1A); // clr pending interrupt
+    bitSet(TIMSK1, OCIE1A); // enable interrupt
   } else {
     TCCR1A = 0;  // Disable toggling OC1A/OC1B on Compare Match.
+    bitClear(TIFR1, OCF1A); // clr pending interrupt
+    bitClear(TIMSK1, OCIE1A); // enable interrupt
   }
+  sei();
 }
 
 CPPM_Class CPPM;

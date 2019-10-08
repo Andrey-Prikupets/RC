@@ -209,10 +209,16 @@ void doPrepare(bool reset_frames) {
       channels
 #endif
     );
-#ifdef RELAY
+#if defined(EMIT_CPPM) || defined(RELAY)    
     // Send channels to CPPM out;
     for (uint8_t i=0; i<NUM_CHANNELS_CPPM; i++) {
-      CPPM.write(i, channels[i]); 
+      CPPM.write_us(i, 
+#ifdef RELAY
+      channels_out_cppm[i]
+#else
+      channels[i]
+#endif
+      ); 
     }
 #endif
     if (reset_frames) {
