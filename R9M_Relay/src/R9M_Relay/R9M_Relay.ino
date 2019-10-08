@@ -1,11 +1,13 @@
 #include <Arduino.h>
+#include "config.h"
+#include "debug.h"
 #include "CPPM.h"
 #include "PXX.h"
 #include "menu.h"
 #include "Seq.h"
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
-#include "debug.h"
+#include "relay.h"
 
 const int LED_PIN = 13;
 const int LED_DIVIDER = 10;
@@ -38,6 +40,12 @@ NEW_SEQ (SEQ_BATTERY_4S,        BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE
 NEW_SEQ (SEQ_BATTERY_LOW,       BEEP_MS(200), PAUSE_MS(200), BEEP_MS(400), PAUSE_MS(200));
 NEW_SEQ (SEQ_BATTERY_MIN,       BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(200));
 
+#ifdef RELAY
+NEW_SEQ (SEQ_RELAY_ACTIVE_NONE, BEEP_MS(100), PAUSE_MS(50),  BEEP_MS(200), PAUSE_MS(50), BEEP_MS(200));
+NEW_SEQ (SEQ_RELAY_ACTIVE_PXX,  BEEP_MS(300), PAUSE_MS(100), BEEP_MS(50));
+NEW_SEQ (SEQ_RELAY_ACTIVE_CPPM, BEEP_MS(50),  PAUSE_MS(100), BEEP_MS(300));
+#endif
+
 #ifdef BEEP_FAILSAFE
 NEW_SEQ (SEQ_FAILSAFE,          BEEP_MS(50));
 #endif
@@ -47,6 +55,11 @@ Seq* seqs[] = {&SEQ_KEY_NEXT, &SEQ_KEY_SELECT, &SEQ_MODE_RANGE_CHECK, &SEQ_MODE_
 #ifdef BEEP_FAILSAFE
                , &SEQ_FAILSAFE
 #endif               
+#ifdef RELAY
+               , &SEQ_RELAY_ACTIVE_NONE
+               , &SEQ_RELAY_ACTIVE_PXX
+               , &SEQ_RELAY_ACTIVE_CPPM
+#endif
                };
 Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Seq*));
 
@@ -145,13 +158,17 @@ void updateVoltageMonitor() {
   }  
 }
 
-int16_t channels[16] = { 1500,1500,1000,1500,1200,1400,1600,1800, 1000,1000,1000,1000,1000,1000,1000,1000};
+int16_t channels[NUM_CHANNELS_PXX] = { 1500,1500,1000,1500,1200,1400,1600,1800, 1000,1000,1000,1000,1000,1000,1000,1000};
+
 static byte missed_frames = 0;
 
+#ifdef RC_MIN_MAX
 bool channelsMinMaxSet = false; 
 static uint8_t channelsMinMaxLock = 50; // Skip first channel values (they might be unstable); 
-int16_t channelsMin[16];
-int16_t channelsMax[16];
+int16_t channelsMin[NUM_CHANNELS_CPPM];
+int16_t channelsMax[NUM_CHANNELS_CPPM];
+#endif
+
 bool cppmActive = false;
 
 extern bool channelValid(int16_t x);
@@ -160,6 +177,7 @@ bool channelValid(int16_t x) {
     return (x >= MIN_SERVO_US && x <= MAX_SERVO_US);
 }
 
+#ifdef RC_MIN_MAX
 void updateChannelsMinMax() {
     if (!channelsMinMaxSet) {
      if (channelsMinMaxLock > 0) {
@@ -167,10 +185,10 @@ void updateChannelsMinMax() {
         return;
       }
       channelsMinMaxSet = true;
-      memcpy(channelsMin, channels, sizeof(channelsMin));
-      memcpy(channelsMax, channels, sizeof(channelsMin));
+      memcpy(channelsMin, channels, NUM_CHANNELS_CPPM*sizeof(channels[0]));
+      memcpy(channelsMax, channels, NUM_CHANNELS_CPPM*sizeof(channels[0]));
     } else {
-      for(uint8_t i = 0; i < 8; i++) {
+      for(uint8_t i = 0; i < NUM_CHANNELS_CPPM; i++) {
         int16_t x = channels[i];
         if (channelsMin[i] > x) {
           channelsMin[i] = x;  
@@ -181,14 +199,40 @@ void updateChannelsMinMax() {
       }
     }
 }
+#endif
 
 void doPrepare(bool reset_frames) {
-    PXX.prepare(channels);
+    PXX.prepare(
+#ifdef RELAY
+      channels_out_pxx
+#else
+      channels
+#endif
+    );
+#if defined(EMIT_CPPM) || defined(RELAY)    
+    // Send channels to CPPM out;
+    for (uint8_t i=0; i<NUM_CHANNELS_CPPM; i++) {
+      CPPM.write_us(i, 
+#ifdef RELAY
+      channels_out_cppm[i]
+#else
+      channels[i]
+#endif
+      ); 
+    }
+#endif
     if (reset_frames) {
       missed_frames = 0;
       flashLED();
     }
 }
+
+void enableR9M(boolean enable) {
+#ifndef DEBUG
+    digitalWrite(R9M_POWER_PIN, enable ? R9M_POWER_ON : R9M_POWER_OFF);
+#endif  
+}
+
 
 #define MAX_ALLOWED_MISSED_FRAMES 10
 
@@ -211,14 +255,18 @@ void loop() {
                     cppmIsValid = false; 
                   } 
               }
+#ifdef RC_MIN_MAX
               updateChannelsMinMax();
+#endif        
           }
           if (cppmIsValid) {
               doPrepare(true);
               setCPPM_Obtained();
-#ifndef DEBUG
-              digitalWrite(R9M_POWER_PIN, R9M_POWER_ON);
-#endif
+#ifdef RELAY
+              updateChannelsRelay(channels);
+              CPPM.enableOutput(true);
+#endif              
+              enableR9M(true);
           } else {
               doPrepare(false);            
           }
@@ -236,8 +284,9 @@ void loop() {
           missed_frames++;
         } else {
           setCPPM_Lost();
-#ifndef DEBUG
-          digitalWrite(R9M_POWER_PIN, R9M_POWER_OFF);
+          enableR9M(false);
+#ifdef RELAY
+          CPPM.enableOutput(false);
 #endif
         }
     }

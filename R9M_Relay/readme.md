@@ -19,6 +19,29 @@ Has channel monitor (it shows current channel values and minimum/maximum per cha
 Provides distinctive sound signals for everything: menu buttons, low voltage, etc.
 Built from Arduino Nano 328p, 128x64 I2C OLED, 2 buttons, 5V BEC, 1 p-channel MOSFET, 4 resistors and breadboard.
 
+### RELAY feature
+RELAY feature provides the method to control 2 copters with single transmitter. The relay device is based on the 1st copter (relay copter) and its CPPM output acts as a receiver outpout.
+PXX output goes to R9M and controls 2nd copter (remote copter). One of the channels with a switch having at least 2 positions (3 is better) provides toggling between copters.
+Active copter is directly controlled by pilot, Inactive goes to GPSHOLD mode. If 3 state switch is used, middle state can force both copters perform GPSHOLD.
+RELAY feature can be enabled by define RELAY in config.h, below there are parameters that should be configured accordingly.
+Of course, relay copter should carry also video receiver to get video from remote copter and video transmitter to send it down to the pilot.
+
+```C
+// Enable to support RELAY mode;
+#define RELAY
+
+#define RELAY_CHANNEL    CH7  // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
+
+#define GPS_MODE_CHANNEL CH8  // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
+#define GPS_HOLD_VALUE   1600 // Set it to enable GPS HOLD in GPS_MODE_CHANNEL on both relay and mission drone;
+
+// RELAY_CHANNEL signal boundaries to enable PXX or CPPM control;
+#define ACTIVE_PXX_MIN   950   // Min. value for make PXX control active;
+#define ACTIVE_PXX_MAX   1350  // Max. value for make PXX control active;
+#define ACTIVE_CPPM_MIN  1650  // Min. value for make CPPM control active;
+#define ACTIVE_CPPM_MAX  2050  // Max. value for make CPPM control active;
+```
+
 ## Tools needed to build
 
 * Arduino environment 1.8.9;

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include "debug.h"
+#include "config.h"
 
 typedef uint8_t Seq10ms;
 

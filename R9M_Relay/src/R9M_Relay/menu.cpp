@@ -2,7 +2,6 @@
 #include "PXX.h"
 #include "CPPM.h"
 
-// #include <avr/pgmspace.h>
 #include <EEPROM.h>
 //#include "U8glib.h"
 #include <U8g2lib.h>
@@ -30,7 +29,15 @@ const uint8_t CURRENT_VERSION = 0x10;
 #define MODE_MENU 4
 #define MODE_MENU 5
 #define MODE_CHANNELS 6
-#define MODE_CHANNELS_RANGE 7
+
+#ifdef RC_MIN_MAX
+#define MODE_CHANNELS_MIN_MAX 7
+#endif
+
+#ifdef RELAY
+#define MODE_RELAY 8
+#endif
+
 static byte menuMode = MODE_LOGO;
 
 // Private variables;
@@ -65,13 +72,14 @@ size_t getLength_F(const __FlashStringHelper *ifsh)
   return n;
 }
 
+// Moves cursor X position - good for sequential calls;
 void drawStr_F(uint8_t x, uint8_t y, const __FlashStringHelper* s_P) {
   u8g.setCursor(x, y);
   u8g.print(s_P);
 }
 
 void drawStrRight_F(uint8_t x, uint8_t y, const __FlashStringHelper* s_P) {
-  u8g.setCursor((uint8_t) u8g.getWidth()-x-getLength_F(s_P)*u8g.getStrWidth("W"), y);
+  u8g.setCursor((uint8_t) u8g.getWidth()-x-getLength_F(s_P)*(u8g.getStrWidth("W")+1), y);
   u8g.print(s_P);
 }
 
@@ -185,16 +193,30 @@ void drawMenu(void) {
 #ifdef DEBUG
   Serial.print("drawMenu="); Serial.println(menu_current);
 #endif  
-  drawMenuItem(0, F("Radio Set."), NULL);
-  drawMenuItem(1, F("RX Monitor"), NULL);
-  drawMenuItem(2, F("RX Min/Max"), NULL);
+  int8_t i = 0;
+  drawMenuItem(i, F("Radio Set."), NULL); i++;
+  drawMenuItem(i, F("RX Monitor"), NULL); i++;
+#ifdef RC_MIN_MAX
+  drawMenuItem(i, F("RX Min/Max"), NULL); i++;
+#endif
+#ifdef RELAY
+  drawMenuItem(i, F("Relay Set."), NULL);
+#endif
 }
 
 static bool invalidValueFlashing = false;
+
+#ifdef RC_MIN_MAX
 static bool showChannels_Min = false;
+#endif
 
 int16_t getChannel_Raw_Min_Max(uint8_t channel) {
-  int16_t* arr = menuMode == MODE_CHANNELS ? channels : showChannels_Min ? channelsMin : channelsMax;
+  int16_t* arr = 
+#ifdef RC_MIN_MAX
+    menuMode == MODE_CHANNELS ? channels : showChannels_Min ? channelsMin : channelsMax;
+#else
+    channels;
+#endif
   return arr[channel];
 }
 
@@ -217,15 +239,27 @@ void drawChannelItems(uint8_t i, uint8_t channelLeft, uint8_t channelRight) {
   u8g.drawStr(MENU_LEFT+(screen_width+char_width)/2, y, buf); 
 
   u8g.setDrawColor(1);
-  if (menuMode == MODE_CHANNELS || channelsMinMaxSet) {
+  if (menuMode == MODE_CHANNELS
+#ifdef RC_MIN_MAX  
+  || channelsMinMaxSet
+#endif
+  ) {
     int16_t x = getChannel_Raw_Min_Max(channelLeft);
-    if (menuMode == MODE_CHANNELS_RANGE || (channelValid(x) || invalidValueFlashing)) {
+    if (
+#ifdef RC_MIN_MAX
+      menuMode == MODE_CHANNELS_MIN_MAX || 
+#endif
+      (channelValid(x) || invalidValueFlashing)) {
       itoa(x, buf, 10);
       u8g.drawStr(MENU_LEFT+char_width+2, y, buf); 
     }
 
     x = getChannel_Raw_Min_Max(channelRight);
-    if (menuMode == MODE_CHANNELS_RANGE || (channelValid(x) || invalidValueFlashing)) {
+    if (
+#ifdef RC_MIN_MAX
+      menuMode == MODE_CHANNELS_MIN_MAX || 
+#endif
+      (channelValid(x) || invalidValueFlashing)) {
       itoa(x, buf, 10);
       u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
     }
@@ -239,9 +273,11 @@ void drawChannels(void) {
     invalidValueFlashing = !invalidValueFlashing;
   }
   
+#ifdef RC_MIN_MAX
   if (timer1.isTriggered(TIMER_CHANNELS_MIN_MAX_FLIP)) {
     showChannels_Min = !showChannels_Min;
   }
+#endif
   
   if (menuMode == MODE_CHANNELS && !cppmActive) {
     drawStr_F(MENU_LEFT, MENU_TOP, F("No CPPM")); 
@@ -271,7 +307,12 @@ void drawChannels(void) {
   u8g.drawStr(MENU_LEFT+char_width*2+4, y, buf);
 
   u8g.drawStr(MENU_LEFT+(screen_width+char_width)/2, y, 
-    menuMode == MODE_CHANNELS ? "=" : showChannels_Min ? "<" : ">"); 
+#ifdef RC_MIN_MAX
+    menuMode == MODE_CHANNELS ? "=" : showChannels_Min ? "<" : ">"
+#else
+    "="
+#endif
+    ); 
 
   itoa(CPPM.getFailReason(), buf, 10);
   int x = screen_width-u8g.getStrWidth(buf);
@@ -298,20 +339,21 @@ void drawMenuRadio(void) {
 }
 
 void drawScreenSaver() {
+  char buf[5];
+
   prepareForDrawing(true);
 
   uint8_t screen_width = (uint8_t) u8g.getWidth();
-  uint8_t char_height = u8g.getFontAscent()-u8g.getFontDescent()+1;
+  uint8_t char_height = u8g.getFontAscent()-u8g.getFontDescent();
   int y = MENU_TOP;
-  drawStr_F(MENU_LEFT, y, F("Batt:")); 
-  char buf[5];
+  drawStr_F(MENU_LEFT, y, F("Bat:"));      
+  itoa(battery1.getNumCells(), buf, 10); // numCells = 1..9;
+  buf[1] = 's';
+  buf[2] = '\0';
+  u8g.print(buf);      
+
   dtostrf(battery1.getCurrVoltage(), 4, 1, buf);
   u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
-  y += char_height;
-
-  drawStr_F(MENU_LEFT, y, F("Cells:")); 
-  itoa(battery1.getNumCells(), buf, 10);
-  u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);      
   y += char_height;
 
   const __FlashStringHelper* s;
@@ -334,6 +376,20 @@ void drawScreenSaver() {
   y += char_height;
 
   drawStr_F(MENU_LEFT, y, getPowerStr()); 
+
+#ifdef RELAY
+  y += char_height;
+  drawStr_F(MENU_LEFT, y, F("Relay:"));   
+  switch (getRelayActive()) {
+  case RELAY_ACTIVE_PXX: s = F("PXX");
+       break;
+  case RELAY_ACTIVE_CPPM: s = F("PPM");
+       break;
+  default: s = F("---");
+       break;
+  }
+  drawStrRight_F(0, y, s);
+#endif
 }
 
 void drawLogo(void) {
@@ -354,6 +410,51 @@ void drawLogo(void) {
   drawCentered_F(y+char_height*1, F("by Andrey"));
   drawCentered_F(y+char_height*2, F("Prikupets"));
 }
+
+#ifdef RELAY
+void drawRelay() {
+  char buf[7];
+
+  prepareForDrawing(false);
+
+  uint8_t screen_width = (uint8_t) u8g.getWidth();
+  uint8_t char_height = u8g.getFontAscent()-u8g.getFontDescent()+1;
+  uint8_t char_width = u8g.getStrWidth("W");
+  int y = MENU_TOP;
+  int x;
+
+  buf[0] = 'C';
+  buf[1] = 'H';
+  itoa(RELAY_CHANNEL+1, buf+2, 10);
+  drawStr_F(MENU_LEFT, y, F("Relay"));   
+  u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
+  y += char_height;
+
+  itoa(GPS_MODE_CHANNEL+1, buf+2, 10);
+  drawStr_F(MENU_LEFT, y, F("GPS"));   
+  u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
+  y += char_height;
+
+  itoa(GPS_HOLD_VALUE, buf, 10);
+  drawStr_F(MENU_LEFT, y, F("GPSHOLD"));   
+  u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
+  y += char_height;
+
+  // Print: PXX: 1111-2222
+  drawStr_F(MENU_LEFT, y, F("PXX:"));
+  u8g.print(itoa(ACTIVE_PXX_MIN, buf, 10));  
+  u8g.print("-");
+  u8g.print(itoa(ACTIVE_PXX_MAX, buf, 10));
+
+  y += char_height;
+  
+  // Print: CPPM: 1111-2222
+  drawStr_F(MENU_LEFT, y, F("PPM:"));
+  u8g.print(itoa(ACTIVE_CPPM_MIN, buf, 10));
+  u8g.print("-");
+  u8g.print(itoa(ACTIVE_CPPM_MAX, buf, 10));
+}
+#endif
 
 void write_settings(void);
 void adjust_settings(void);
@@ -393,7 +494,19 @@ void updateMenuRadio(uint8_t key) {
   }
 }
 
-#define MENU_ITEMS 3
+#ifdef RC_MIN_MAX
+  #ifdef RELAY
+    #define MENU_ITEMS 4
+  #else
+    #define MENU_ITEMS 3
+  #endif
+#else
+  #ifdef RELAY
+    #define MENU_ITEMS 3
+  #else
+    #define MENU_ITEMS 2
+  #endif
+#endif
 
 uint8_t updateMenu(uint8_t key) {  
   switch ( key ) {
@@ -409,7 +522,16 @@ uint8_t updateMenu(uint8_t key) {
       switch(menu_current) {
         case 0: return MODE_RADIO;
         case 1: return MODE_CHANNELS;
-        case 2: return MODE_CHANNELS_RANGE;
+#ifdef RC_MIN_MAX
+        case 2: return MODE_CHANNELS_MIN_MAX;
+  #ifdef RELAY
+        case 3: return MODE_RELAY;
+  #endif
+#else
+  #ifdef RELAY
+        case 2: return MODE_RELAY;
+  #endif
+#endif
       }
       break;
   }
@@ -547,6 +669,18 @@ void showChannels(uint8_t mode) {
     } while( u8g.nextPage() );  
 }
 
+#ifdef RELAY
+void showRelay() {
+    if (menuMode != MODE_RELAY) {
+        menuMode = MODE_RELAY;
+    }
+    u8g.firstPage();
+    do  {
+      drawRelay();
+    } while( u8g.nextPage() );  
+}
+#endif
+
 void handleBeeps(void) {
   if (timer1.isTriggered(TIMER_MODE_SOUND)) {
     if (PXX.getModeRangeCheck()) {
@@ -581,7 +715,11 @@ void menuLoop(void)
         updateMenuRadio(key);
         refreshMenuMode = MODE_RADIO; // Refresh Radio menu to update navigation;
     } else
-    if (menuMode == MODE_CHANNELS || menuMode == MODE_CHANNELS_RANGE) { // Exit from Channels menu by a key;
+    if (menuMode == MODE_CHANNELS 
+#ifdef RC_MIN_MAX    
+        || menuMode == MODE_CHANNELS_MIN_MAX
+#endif    
+    ) { // Exit from Channels menu by a key;
         beeper1.play(&SEQ_KEY_SELECT);
         refreshMenuMode = MODE_MENU; // Show Main menu;
     } else
@@ -616,6 +754,12 @@ void menuLoop(void)
       if (cppmModeChanged()) {
           refreshMenuMode = menuMode;
       }
+      // Refresh if Relay mode switched;
+#ifdef RELAY      
+      if (isRelayActiveChanged()) {
+          refreshMenuMode = menuMode;
+      }
+#endif      
       // Refresh Screensaver if battery voltage changed (with the given update period);
       if (timer1.isTriggered(TIMER_BATTERY_SCREEN)) {
         if (battery1.isVoltageChanged()) {
@@ -624,7 +768,9 @@ void menuLoop(void)
       }
       break;
     case MODE_CHANNELS:
-    case MODE_CHANNELS_RANGE:
+#ifdef RC_MIN_MAX    
+    case MODE_CHANNELS_MIN_MAX:
+#endif    
       // Refresh Channels with the given update period;
       if (timer1.isTriggered(TIMER_CHANNELS_SCREEN)) {
         refreshMenuMode = menuMode;
@@ -644,9 +790,16 @@ void menuLoop(void)
       showMenu();
       break;
     case MODE_CHANNELS:
-    case MODE_CHANNELS_RANGE:
+#ifdef RC_MIN_MAX    
+    case MODE_CHANNELS_MIN_MAX:
+#endif    
       showChannels(refreshMenuMode);
       break;
+#ifdef RELAY      
+    case MODE_RELAY:
+      showRelay();
+      break;
+#endif      
   }
 }
 

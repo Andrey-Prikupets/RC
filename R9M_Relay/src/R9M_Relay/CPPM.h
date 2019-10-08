@@ -52,6 +52,8 @@
 // Input Capture Pin 8
 // Output Pin 9
 
+#define NUM_CHANNELS_CPPM 8
+
 //------------------------------------------------------------------------------
 
 // all times are written with a granularity of 1us
@@ -99,7 +101,7 @@
 
 #define CPPM_FRAME_LENGTH_FLOOR CPPM_T_floor(21980 - 980) //(R615X_FRAME_LENGTH) // frame length too short ?
 
-#define CPPM_MSERVO 9 // 9 servos maximum in a 22ms frame
+#define CPPM_MSERVO 8 // 9 servos maximum in a 22ms frame
 
 enum {CPPM_AILE, CPPM_ELEV, CPPM_THRO, CPPM_RUDD, CPPM_GEAR, CPPM_AUX1, CPPM_AUX2, CPPM_AUX3, CPPM_AUX4};
 // standard definitions of Spektrum receivers (AR6200, R615X, R920X,...)
@@ -167,6 +169,7 @@ class CPPM_Class
 		uint16_t oservos[CPPM_MSERVO]; // cppm output servo pulse width
 
 		uint8_t fail_reason;
+    bool outputEnabled;
 
   public:
 
@@ -190,7 +193,8 @@ class CPPM_Class
 
 		void write_us(int n, int v); // +2015-04-06
 
-		operator bool();
+    void enableOutput(boolean enable);
+    bool getOutputEnabled() { return outputEnabled; }
 
 		uint8_t getFailReason(void) { return fail_reason; } 
 		bool getErrorCount(void) { return errors; } 

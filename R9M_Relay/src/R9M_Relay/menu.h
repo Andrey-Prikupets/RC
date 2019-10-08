@@ -3,12 +3,19 @@
 
 #include <Arduino.h>
 #include <avr/pgmspace.h>
+#include "config.h"
+#include "debug.h"
 #include "Seq.h"
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
-#include "debug.h"
+#include "relay.h"
 
-#define VERSION "PPM-PXX 01" // NOTE: No more than 10 characters for 64x48 OLED display!
+// Different titles to determine RELAY firmware;
+#ifdef RELAY
+#define VERSION "PPM+PXX " VERSION_NUMBER // NOTE: No more than 10 characters for 64x48 OLED display!
+#else
+#define VERSION "PPM-PXX " VERSION_NUMBER // NOTE: No more than 10 characters for 64x48 OLED display!
+#endif
 
 // Configurable parameters;
 #define MAX_RX_NUM 10 // Up to 255(?), but bigger number requires longer scrolling through RX number menu;
@@ -39,7 +46,9 @@ extern const uint8_t TIMER_BATTERY_SCREEN;
 extern const uint8_t TIMER_NO_CPPM;
 extern const uint8_t TIMER_CHANNELS_SCREEN;
 extern const uint8_t TIMER_INVALID_FLASHING;
+#ifdef RC_MIN_MAX
 extern const uint8_t TIMER_CHANNELS_MIN_MAX_FLIP;
+#endif
 
 extern Seq SEQ_MODE_RANGE_CHECK;
 extern Seq SEQ_MODE_BIND;
@@ -51,10 +60,13 @@ extern Seq SEQ_MODE_GOT_CPPM;
 
 extern bool channelValid(int16_t x);
 
-extern bool channelsMinMaxSet;
 extern bool cppmActive;
 extern int16_t channels[16];
-extern int16_t channelsMin[16];
-extern int16_t channelsMax[16];
+
+#ifdef RC_MIN_MAX
+extern int16_t channelsMin[NUM_CHANNELS_CPPM];
+extern int16_t channelsMax[NUM_CHANNELS_CPPM];
+extern bool channelsMinMaxSet;
+#endif
 
 #endif // MENU_H
