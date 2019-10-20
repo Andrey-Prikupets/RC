@@ -20,14 +20,10 @@
 
 #include "crossfire.h"
 
-#define CROSSFIRE_CH_CENTER         0x3E0
-#define CROSSFIRE_CH_BITS           11
-
 uint8_t crc8(const uint8_t * ptr, uint32_t len);
 
-// WAS: Range for pulses (channels output) is [-1024:+1024]
-// Now: 
-uint8_t createCrossfireChannelsFrame(CrossfirePulsesData* data, int16_t * pulses)
+// Range for pulses (channels output) is [-1024:+1024]
+void createCrossfireChannelsFrame(CrossfirePulsesData* data, int16_t * channels, int8_t numChannels)
 {
   uint8_t * buf = data->pulses;
   *buf++ = MODULE_ADDRESS;
@@ -36,8 +32,25 @@ uint8_t createCrossfireChannelsFrame(CrossfirePulsesData* data, int16_t * pulses
   *buf++ = CHANNELS_ID;
   uint32_t bits = 0;
   uint8_t bitsavailable = 0;
-  for (int i=0; i<CROSSFIRE_CHANNELS_COUNT; i++) {
-    uint32_t val = constrain(0, 2*CROSSFIRE_CH_CENTER, CROSSFIRE_CH_CENTER + (((pulses[i]) * 4) / 5));
+#ifdef DEBUG_CROSSFIRE_CHANNELS
+  Serial.print("CRCH> ");  
+#endif
+  for (int i=0; i<CROSSFIRE_CHANNELS_COUNT; i++) { 
+    int16_t std_value = i<numChannels ? channels[i] : 0;
+    uint32_t val0 =  CROSSFIRE_CH_CENTER + ((std_value * 4) / 5);
+    uint32_t val = constrain(val0, 0, 2*CROSSFIRE_CH_CENTER);
+#ifdef DEBUG_CROSSFIRE_CHANNELS
+    if (i>0)
+      Serial.print(" ");  
+    Serial.print((i+1), DEC);  
+    Serial.print(":");  
+    Serial.print(val, DEC);
+    if (val != val0) {
+      Serial.print("(");  
+      Serial.print(val0, DEC);  
+      Serial.print(")");
+    }
+#endif
     bits |= val << bitsavailable;
     bitsavailable += CROSSFIRE_CH_BITS;
     while (bitsavailable >= 8) {
@@ -46,8 +59,11 @@ uint8_t createCrossfireChannelsFrame(CrossfirePulsesData* data, int16_t * pulses
       bitsavailable -= 8;
     }
   }
+#ifdef DEBUG_CROSSFIRE_CHANNELS
+  Serial.println();  
+#endif
   *buf++ = crc8(crc_start, 23);
-  return buf - data->pulses;
+  data->len = buf - data->pulses;
 }
 
 // CRC8 implementation with polynom = x^8+x^7+x^6+x^4+x^2+1 (0xD5)
@@ -102,15 +118,32 @@ void setupCrossfire(CrossfirePulsesData* data) {
   memset(data->pulses, 0, CROSSFIRE_FRAME_MAXLEN);
 }
 
+static unsigned long prevFrameMs = 0;
+
 void sendCrossfireFrame(CrossfirePulsesData* data, bool waitNextFrame) {
-  static unsigned long prevFrameMs = 0;
   unsigned long ms = millis(); 
+  // CrossFire - 3.36ms between frames; 0.64ms - frame length;
+  // Gaps is LOW; Signal - High;
+  // Each frame starts with 0xEE; 0x18;
   if (waitNextFrame && ms-prevFrameMs < CROSSFIRE_PERIOD)
     return;
 
   prevFrameMs = ms;
 
 #ifndef DEBUG
-  Serial.write(data->pulses, CROSSFIRE_FRAME_MAXLEN);  
+  Serial.write(data->pulses, data->len);  
+#else
+#ifdef DEBUG_CROSSFIRE
+  Serial.print("CRSF> ");  
+  for (uint8_t i=0; i<data->len; i++) {
+    if (i>0)
+      Serial.print(" ");  
+    Serial.print(i, DEC);  
+    Serial.print(":");  
+    Serial.print(data->pulses[i], HEX);      
+  }
+  Serial.println();  
+  Serial.println();  
 #endif  
+#endif
 }

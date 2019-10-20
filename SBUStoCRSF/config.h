@@ -4,8 +4,8 @@
 
 #define VERSION_NUMBER "00"
 
-// Comment when OLED screen is not connected;
-#define OLED
+// Comment out when OLED screen is not connected;
+//#define OLED
 
 // Turn off all sounds;
 //#define SOUND_OFF
@@ -16,5 +16,9 @@
 // Send only 16 of 18 channels to Crossfire;
 // May change to lower numbers if needed;
 #define NUM_CHANNELS_SBUS 16
+
+// Channels impulse ranges;
+#define CPPM_RANGE_MIN 988
+#define CPPM_RANGE_MAX 2012
 
 #endif

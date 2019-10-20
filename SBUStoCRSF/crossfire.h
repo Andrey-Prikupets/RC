@@ -139,12 +139,19 @@ enum CrossfireSensorIndexes {
 
 PACK(struct CrossfirePulsesData {
   uint8_t pulses[CROSSFIRE_FRAME_MAXLEN];
+  uint8_t len;
 });
+
+#define CROSSFIRE_CH_CENTER         0x3E0 // 992; 2x = 1984;
+#define CROSSFIRE_CH_BITS           11
 
 // CrossfirePulsesData crossfire;
 
+#define CROSSFIRE_RANGE_MIN -1024
+#define CROSSFIRE_RANGE_MAX 1024
+
 // Range for pulses (channels output) is [-1024:+1024]
-uint8_t createCrossfireChannelsFrame(CrossfirePulsesData* data, int16_t * pulses);
+void createCrossfireChannelsFrame(CrossfirePulsesData* data, int16_t * channels, int8_t numChannels);
 
 void setupCrossfire(CrossfirePulsesData* data);
 

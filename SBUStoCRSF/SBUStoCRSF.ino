@@ -144,7 +144,7 @@ void initChannels() {
   }
 }
 
-#ifdef DEBUG
+#ifdef DEBUG_CHANNELS
 void debugChannels() {
   for (int i=1; i <= NUM_CHANNELS_SBUS; ++i) {
     Serial.print(i, DEC); 
@@ -164,8 +164,6 @@ void debugChannels() {
 
 static byte missed_frames = 0;
 
-bool sbusActive = false;
-
 extern bool channelValid(int16_t x);
 
 bool channelValid(int16_t x) {
@@ -173,7 +171,25 @@ bool channelValid(int16_t x) {
 }
 
 void doPrepare(bool reset_frames) {
-    createCrossfireChannelsFrame(&crossfire, channels);
+    // Mapping channels from CPPM range to CrossFire;
+    int16_t standardChannels[NUM_CHANNELS_SBUS];
+#ifdef DEBUG_STD_CHANNELS
+  Serial.print("CHST> ");  
+#endif    
+    for (uint8_t i=0; i<NUM_CHANNELS_SBUS; i++) {
+      standardChannels[i] = map(channels[i], CPPM_RANGE_MIN, CPPM_RANGE_MAX, CROSSFIRE_RANGE_MIN, CROSSFIRE_RANGE_MAX);
+#ifdef DEBUG_STD_CHANNELS
+    if (i>0)
+      Serial.print(" ");  
+    Serial.print((i+1), DEC);  
+    Serial.print(":");  
+    Serial.print(standardChannels[i], DEC);      
+#endif
+    }
+#ifdef DEBUG_STD_CHANNELS
+  Serial.println();  
+#endif
+    createCrossfireChannelsFrame(&crossfire, standardChannels, NUM_CHANNELS_SBUS);
     if (reset_frames) {
       missed_frames = 0;
       flashLED();
@@ -183,15 +199,20 @@ void doPrepare(bool reset_frames) {
 #define MAX_ALLOWED_MISSED_FRAMES 10
 
 void loop() {
-    bool sbusIsValid = sbusActive = sbus.hasSignal() && !sbus.signalLossActive() && !sbus.failsafeActive();
+    bool sbusIsValid = sbus.hasSignal() && !sbus.signalLossActive() && !sbus.failsafeActive();
     if (sbusIsValid) {
         for(uint8_t i = 0; i < NUM_CHANNELS_SBUS; i++) {
-            int16_t x = channels[i] = sbus.getChannel(i+1);
+            // SBUS range is different from CPPM, but getChannels already returns channels mapped to CPPM range;
+            int16_t x = sbus.getChannel(i+1); // 988..2012
             if (!channelValid(x)) {
               sbusIsValid = false; 
             } 
         }
     }
+#ifdef DEBUG_CHANNELS
+    debugChannels();
+#endif          
+    // If sbus channels are invalid, these channels should not be sent to Crossfire, but should be displayed in OLED;
     if (sbusIsValid) {
         doPrepare(true);
         setSBUS_Obtained();
@@ -199,8 +220,10 @@ void loop() {
         doPrepare(false);            
     }
 
-    if (missed_frames < MAX_ALLOWED_MISSED_FRAMES) {
-      sendCrossfireFrame(&crossfire, true);
+    sendCrossfireFrame(&crossfire, true); // TODO Remove
+    
+    if (sbus.hasSignal() && missed_frames < MAX_ALLOWED_MISSED_FRAMES) {
+      // sendCrossfireFrame(&crossfire, true);
       if (missed_frames == 1) { // Beep on 1st missed SBUS frame;
         beeper1.play(&SEQ_MODE_SBUS_MISSED);            
       }
