@@ -206,6 +206,8 @@ void loop() {
             int16_t x = sbus.getChannel(i+1); // 988..2012
             if (!channelValid(x)) {
               sbusIsValid = false; 
+            } else {
+              channels[i] = x;
             } 
         }
     }

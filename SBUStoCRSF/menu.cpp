@@ -139,13 +139,13 @@ void drawChannels(void) {
   setInfoPos(INFO_FAILSAFE);
   char* p = buf;
   if (sbus.signalLossActive()) {
-    *p++ = "S";
-    *p++ = "L";
-    *p++ = " ";
+    *p++ = 'S';
+    *p++ = 'L';
+    *p++ = ' ';
   }
   if (sbus.failsafeActive()) {
-    *p++ = "F";
-    *p++ = "S";
+    *p++ = 'F';
+    *p++ = 'S';
   }
   *p++ = 0;
   u8g.print(buf);      
