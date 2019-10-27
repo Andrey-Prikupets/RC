@@ -26,8 +26,7 @@
 
 // Disable if Watchdog not needed or IWatchdog library not available;
 // IWatchdog - from https://github.com/stm32duino/Arduino_Core_STM32
-// Downloaded as ZIP and unpacked only Arduino_Core_STM32-master/libraries/IWatchdog and placed into Arduino %Sketchbook%\library folder;
-#define WATCHDOG_TIME_MS 500
+//#define WATCHDOG_TIME_MS 500
 
 #define LOGO_DELAY_MS 1000
 

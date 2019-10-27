@@ -1,19 +1,37 @@
 #include <Arduino.h>
 #include "config.h"
 #include "debug.h"
-#include "sbus.h" // Used library: 
+#include "sbus.h" 
 #include "crossfire.h"
 #include "menu.h"
 #include "Seq.h"
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
 
-#ifndef MCU_STM32F103C8 // ARDUINO_ARCH_STM32F1
-  #error This sketch should be flashed to STM32F1 'Blue Pill' device only!
+// MCU_STM32F103C8 - Core STM32F1 from http://dan.drown.org/stm32duino/package_STM32duino_index.json
+// ARDUINO_BLUEPILL_F103C8 - Core from https://github.com/stm32duino/BoardManagerFiles/raw/master/STM32/package_stm_index.json
+// Note: Last core supports WatchDog but seems does not work;
+
+#ifndef ARDUINO_BLUEPILL_F103C8
+  #ifndef MCU_STM32F103C8 
+    #error This sketch should be flashed to STM32F1 'Blue Pill' device only. "Official" stm32duino core and "dan.drown.org"/"roger clark" core is supported;
+  #else
+    #define CORE_DAN_DROWN
+  #endif
+#else
+  #define CORE_OFFICIAL
+#endif
+
+#ifdef CORE_OFFICIAL
+    #error "Offical" STM32 Arduino core is NOT supported. Please install STM32F1 (STM32Duino.com) so called "dan.drown.org" core.
 #endif
 
 #ifdef WATCHDOG_TIME_MS
-#include "watchdog.h"
+  #ifdef CORE_OFFICIAL
+    #include <IWatchdog.h>
+  #else
+    #error Watchdog is not supported with "dan.drown.org"/"roger clark" core. Comment out #define WATCHDOG_TIME_MS in config.h; 
+  #endif
 #endif
 
 // Pins definitions;
@@ -76,21 +94,32 @@ BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 #define MAX_SERVO_US 2100
 
 // Serial ports used;
-#define sbusSerial      Serial1 // The default pinout of Serial1 is TX - PA9 ( Arduino D8) and RX - PA10 (Arduino D2).
-#define crossfireSerial Serial2 // The default pinout of Serial2 is TX - PA2 ( Arduino D12) and RX - PA3 (Arduino D13).
+#ifdef CORE_OFFICIAL
+  HardwareSerial sbusSerial(USART1); // The default pinout of Serial1 is TX - PA9 ( Arduino D8) and RX - PA10 (Arduino D2).
+  HardwareSerial crossfireSerial(USART2); // The default pinout of Serial2 is TX - PA2 ( Arduino D12) and RX - PA3 (Arduino D13).
+
+  HardwareTimer sbusTimer(TIM1);
+  HardwareTimer crossfireTimer(TIM2);
+
+  void setupSBusTimer(HardwareTimer*);
+  void setupCrossfireTimer(HardwareTimer*);  
+#else 
+  #define sbusSerial      Serial1 // The default pinout of Serial1 is TX - PA9 ( Arduino D8) and RX - PA10 (Arduino D2).
+  #define crossfireSerial Serial2 // The default pinout of Serial2 is TX - PA2 ( Arduino D12) and RX - PA3 (Arduino D13).
+
+  HardwareTimer sbusTimer(1);
+  HardwareTimer crossfireTimer(2);
+
+  void setupSBusTimer();
+  void setupCrossfireTimer();  
+#endif
 
 SBUS sbus (sbusSerial);
 CrossfirePulsesData crossfire;
 
-HardwareTimer sbusTimer(1);
-HardwareTimer crossfireTimer(2);
-
 bool enableCrossfire = false;
 
 void initChannels();
-
-void setupSBusTimer();
-void setupCrossfireTimer();
 
 void setup() {
 #ifdef DEBUG
@@ -102,8 +131,10 @@ void setup() {
     showLogo();
     delay(LOGO_DELAY_MS);
 
-#ifdef WATCHDOG_TIME_MS
+#ifdef CORE_OFFICIAL
+  #ifdef WATCHDOG_TIME_MS
     IWatchdog.begin(WATCHDOG_TIME_MS*1000);
+  #endif
 #endif
 
     sbus.begin();  
@@ -125,12 +156,20 @@ void setup() {
     showScreenSaver();
 }
 
+#ifdef CORE_OFFICIAL
+void sbusProcess(HardwareTimer*)
+#else
 void sbusProcess()
+#endif
 {
   sbus.process();
 }
 
+#ifdef CORE_OFFICIAL
+void crossfireSend(HardwareTimer*)
+#else
 void crossfireSend()
+#endif
 {
   if (!enableCrossfire)
     return;
@@ -141,18 +180,35 @@ void crossfireSend()
 void setupSBusTimer()
 {
   sbusTimer.pause();
+#ifdef CORE_OFFICIAL
+  #define SBUS_TIMER_CHANNEL 1
+  sbusTimer.setOverflow(SBUS_TIMER_PERIOD_MS, MICROSEC_FORMAT);
+//  sbusTimer.setMode(SBUS_TIMER_CHANNEL, TIMER_OUTPUT_COMPARE);
+//  sbusTimer.setCompare(SBUS_TIMER_CHANNEL, 1); // overflow might be small
+  sbusTimer.attachInterrupt(SBUS_TIMER_CHANNEL, sbusProcess);
+#else
   sbusTimer.setMode(TIMER_CH1, TIMER_OUTPUTCOMPARE);
   sbusTimer.setPeriod(SBUS_TIMER_PERIOD_MS);
   sbusTimer.setCompare(TIMER_CH1, 1); // overflow might be small
   sbusTimer.attachInterrupt(TIMER_CH1, sbusProcess);
+#endif
   sbusTimer.resume();
 }
 
+#define CROSSFIRE_TIMER_CHANNEL 1
+
 void setupCrossfireTimer() {
   crossfireTimer.pause();
+#ifdef CORE_OFFICIAL
+  crossfireTimer.setOverflow(CROSSFIRE_PERIOD*1000, MICROSEC_FORMAT);
+//  crossfireTimer.setMode(CROSSFIRE_TIMER_CHANNEL, TIMER_OUTPUT_COMPARE);
+//  crossfireTimer.setCompare(CROSSFIRE_TIMER_CHANNEL, 1); // overflow might be small
+  crossfireTimer.attachInterrupt(CROSSFIRE_TIMER_CHANNEL, crossfireSend);  
+#else
   crossfireTimer.setPeriod(CROSSFIRE_PERIOD*1000);
   crossfireTimer.attachInterrupt(TIMER_UPDATE_INTERRUPT, crossfireSend);  
-  crossfireTimer.resume(); // Will be started later when SBUS signal will be valid;
+#endif
+  crossfireTimer.resume();
 }
 
 void flashLED() {
@@ -350,18 +406,23 @@ void loop() {
 
     menuLoop();
 
-#ifdef WATCHDOG_TIME_MS
+#if defined(CORE_OFFICIAL) && defined(WATCHDOG_TIME_MS)
     IWatchdog.reload();
 #endif
 
+// Test Watchdog;
+//    if (sbus.getBytesCount() > 20000) {
+///      delay(2000);
+///    }
+
 #ifdef DEBUG
-#ifndef WATCHDOG_TIME_MS
+  #if !defined(CORE_OFFICIAL) || !defined(WATCHDOG_TIME_MS)
     delay(1000);
-#else
+  #else
     for (int i=0; i<1000; i++) {
       delay(1);
       IWatchdog.reload();
     }
-#endif
+  #endif
 #endif    
 }
