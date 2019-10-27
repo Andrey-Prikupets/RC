@@ -17,10 +17,18 @@
 // May change to lower numbers if needed;
 #define NUM_CHANNELS_SBUS 16
 
-// Channels impulse ranges;
-#define CPPM_RANGE_MIN 988
-#define CPPM_RANGE_MAX 2012
+// Standard CPPM Channels impulse ranges that SBUS can handle;
+#define CPPM_RANGE_MIN 857
+#define CPPM_RANGE_MAX 2143
+#define SBUS_TO_CPPM_CENTER_SHIFT +3 // set to 0 if no shift is needed;
 
 #define SBUS_TIMER_PERIOD_MS 249 // Check incoming data each 249us = 4 kHz;
+
+// Disable if Watchdog not needed or IWatchdog library not available;
+// IWatchdog - from https://github.com/stm32duino/Arduino_Core_STM32
+// Downloaded as ZIP and unpacked only Arduino_Core_STM32-master/libraries/IWatchdog and placed into Arduino %Sketchbook%\library folder;
+#define WATCHDOG_TIME_MS 500
+
+#define LOGO_DELAY_MS 1000
 
 #endif

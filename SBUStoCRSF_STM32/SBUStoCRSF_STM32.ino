@@ -8,23 +8,33 @@
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
 
-#ifndef ARDUINO_ARCH_STM32F1
-  #error This sketch should be flashed to STM32F1 "Blue Pill" device only!
+#ifndef MCU_STM32F103C8 // ARDUINO_ARCH_STM32F1
+  #error This sketch should be flashed to STM32F1 'Blue Pill' device only!
 #endif
+
+#ifdef WATCHDOG_TIME_MS
+#include "watchdog.h"
+#endif
+
+// Pins definitions;
 
 const int8_t LED_PIN = PC13; // NOTE: LED in Blue Pill is inverted;
 #define LED_ON  LOW
 #define LED_OFF HIGH 
-const int8_t LED_DIVIDER = 10;
+const int8_t LED_DIVIDER = 10; // LED Flasher frequency divider;
 
-const int8_t BEEPER_PIN  = PA7; // D11;
-const int8_t VOLTAGE_PIN = PB0; // A3;
+const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V;
+const int8_t VOLTAGE_PIN = PA5; 
 
+// Voltage per cell limits for Battery Low beep and Battery Critically Low beep;
 const float LOW_VOLTAGE = 3.47f;
 const float MIN_VOLTAGE = 3.33f;
-const float correction  = 0.947f;
-const float DIVIDER = (680.0f+10000.0f)/680.0f * correction; // Resistor divider: V+ ----| 10k |--- ADC ----| 680 | --- GND 
 
+// Voltage meter correction; 
+const float correction  = 0.9875; // Fine tune it by measuring real voltage and shown voltage; correction=Vreal/Vmeasured;
+const float DIVIDER = (2200.0f+10000.0f)/2200.0f * correction; // Resistor divider: V+ ----| 10k |--- ADC ----| 2.2k | --- GND 
+
+// Beeper sequences;
 NEW_SEQ (SEQ_MODE_SBUS_LOST,    BEEP_MS(300), PAUSE_MS(70), BEEP_MS(200), PAUSE_MS(50), BEEP_MS(100));
 NEW_SEQ (SEQ_MODE_NO_SBUS,      BEEP_MS(30),  PAUSE_MS(20), BEEP_MS(100), PAUSE_MS(50), BEEP_MS(50), PAUSE_MS(20), BEEP_MS(30));
 NEW_SEQ (SEQ_MODE_GOT_SBUS,     BEEP_MS(100), PAUSE_MS(50), BEEP_MS(200), PAUSE_MS(70), BEEP_MS(300));
@@ -41,6 +51,7 @@ Seq* seqs[] = {&SEQ_MODE_SBUS_LOST, &SEQ_MODE_NO_SBUS, &SEQ_MODE_GOT_SBUS, &SEQ_
                &SEQ_BATTERY_1S, &SEQ_BATTERY_2S, &SEQ_BATTERY_3S, &SEQ_BATTERY_4S, &SEQ_BATTERY_LOW, &SEQ_BATTERY_MIN};
 Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Seq*));
 
+// Multi timers definitions;
 // 0  200ms   Battery reading update;
 // 1  500ms   Screen update;
 // 2  3s      No SBUS alert;
@@ -61,9 +72,10 @@ BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
 // Servo impulse range where it is valid;
 // Note: FrSky X4R in Failsafe with No Pulses setting continues emitting impulses of 800-850us;
-#define MIN_SERVO_US 940
-#define MAX_SERVO_US 2060
+#define MIN_SERVO_US 900
+#define MAX_SERVO_US 2100
 
+// Serial ports used;
 #define sbusSerial      Serial1 // The default pinout of Serial1 is TX - PA9 ( Arduino D8) and RX - PA10 (Arduino D2).
 #define crossfireSerial Serial2 // The default pinout of Serial2 is TX - PA2 ( Arduino D12) and RX - PA3 (Arduino D13).
 
@@ -82,13 +94,18 @@ void setupCrossfireTimer();
 
 void setup() {
 #ifdef DEBUG
-  Serial.begin(115200);
+  Serial.begin(DEBUG_BAUD);
 #endif
     initChannels();
     menuSetup();
     setupCrossfire(crossfireSerial, &crossfire);
     showLogo();
-    delay(2500);
+    delay(LOGO_DELAY_MS);
+
+#ifdef WATCHDOG_TIME_MS
+    IWatchdog.begin(WATCHDOG_TIME_MS*1000);
+#endif
+
     sbus.begin();  
     setupSBusTimer();
     setupCrossfireTimer();
@@ -194,6 +211,7 @@ void initChannels() {
 
 #ifdef DEBUG_CHANNELS
 void debugChannels() {
+    Serial.print("CPPM: ");
     if (!sbus.hasSignal())
       Serial.print("NO SIG ");
 #ifdef DEBUG_SBUS
@@ -207,6 +225,34 @@ void debugChannels() {
     Serial.print(i, DEC); 
     Serial.print("=");
     Serial.print(channels[i-1], DEC); 
+    Serial.print(" ");
+  }
+  if (sbus.signalLossActive())
+    Serial.print("SL ");
+    
+  if (sbus.failsafeActive())
+    Serial.print("FS");
+
+  Serial.println();
+}
+#endif
+
+#ifdef DEBUG_SBUS_RAW_CHANNELS
+void debugSBUSRawChannels() {
+    Serial.print("SBUS: ");
+    if (!sbus.hasSignal())
+      Serial.print("NO SIG ");
+#ifdef DEBUG_SBUS
+    Serial.print("F: ");
+    Serial.print(sbus.getFramesCount(), DEC);
+    Serial.print(", B: ");
+    Serial.print(sbus.getBytesCount(), DEC);
+    Serial.print(", ");
+#endif        
+  for (int i=1; i <= NUM_CHANNELS_SBUS; ++i) {
+    Serial.print(i, DEC); 
+    Serial.print("=");
+    Serial.print(sbus.getRawChannel(i), DEC); 
     Serial.print(" ");
   }
   if (sbus.signalLossActive())
@@ -268,9 +314,15 @@ void loop() {
             }
         }
     }
+
+#ifdef DEBUG_SBUS_RAW_CHANNELS
+    debugSBUSRawChannels();
+#endif
+
 #ifdef DEBUG_CHANNELS
     debugChannels();
 #endif          
+
     // If sbus channels are invalid, these channels should not be sent to Crossfire, but should be displayed in OLED;
     if (sbusIsValid) {
         doPrepare(true);
@@ -297,4 +349,19 @@ void loop() {
     }
 
     menuLoop();
+
+#ifdef WATCHDOG_TIME_MS
+    IWatchdog.reload();
+#endif
+
+#ifdef DEBUG
+#ifndef WATCHDOG_TIME_MS
+    delay(1000);
+#else
+    for (int i=0; i<1000; i++) {
+      delay(1);
+      IWatchdog.reload();
+    }
+#endif
+#endif    
 }

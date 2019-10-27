@@ -131,7 +131,7 @@ void sendCrossfireFrame(CrossfirePulsesData* data) {
   // Each frame starts with 0xEE; 0x18;
   _serial->write(data->pulses, data->len);  
 
-#ifdef DEBUG_CROSSFIRE
+#ifdef DEBUG_CROSSFIRE_PULSES
   Serial.print("CRSF> ");  
   for (uint8_t i=0; i<data->len; i++) {
     if (i>0)

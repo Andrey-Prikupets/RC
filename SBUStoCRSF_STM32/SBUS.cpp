@@ -1,5 +1,4 @@
 #include "SBUS.h"
-#include <Arduino.h>
 
 // flag field
 #define FLAG_CHANNEL_17  1
@@ -19,11 +18,11 @@ void SBUS::begin() {
 	_signalLossActive = false;
 	_failsafeActive = false;
 	_hasSignal = false;
-  timeoutMs = 0;
+	timeoutMs = 0;
 	_serial.begin(SBUS_BAUD, SERIAL_8E2);
 #ifdef DEBUG_SBUS
- _framesCount = 0;
- _bytesCount = 0;
+	_framesCount = 0;
+	_bytesCount = 0;
 #endif    
 }
 
@@ -39,7 +38,7 @@ void SBUS::process() {
 	while (_serial.available()) {
 		byte rx = _serial.read();
 #ifdef DEBUG_SBUS
-    _bytesCount++;   
+		_bytesCount++;   
 #endif    
 		if (buffer_index == 0 && rx != SBUS_STARTBYTE) {
 			//incorrect start byte, out of sync
@@ -78,7 +77,7 @@ void SBUS::process() {
 			_signalLossActive = b23 & FLAG_SIGNAL_LOSS;
 			_failsafeActive = b23 & FLAG_FAILSAFE;
 #ifdef DEBUG_SBUS
-      _framesCount++;
+			_framesCount++;
 #endif    
 			gotData = true;
 		}
@@ -89,31 +88,42 @@ void SBUS::process() {
 		_hasSignal = (ms <= timeoutMs);		
 	} else {
 		timeoutMs = millis()+SBUS_TIMEOUT_MS;
-    _hasSignal = true;
+		_hasSignal = true;
 	}
 }
 
 // channels start from 1 to 18
+// SBUS has values 0..7FF = 0..2047; Middle is 1023.
 // returns value 988..2012 (cleanflight friendly)
 uint16_t SBUS::getChannel(uint8_t channel) { // channel is 1-based;
-  uint8_t ch = channel-1;
-  noInterrupts(); 
-  uint16_t  result = _channels[ch]; 
-  interrupts();
-  return 5 * result / 8 + 880;
+	uint8_t ch = channel-1;
+	noInterrupts(); 
+	uint16_t  result = _channels[ch]; 
+	interrupts();
+	return map(result, SBUS_RANGE_MIN, SBUS_RANGE_MAX, CPPM_RANGE_MIN+SBUS_TO_CPPM_CENTER_SHIFT, CPPM_RANGE_MAX+SBUS_TO_CPPM_CENTER_SHIFT);
 }
 
+uint16_t SBUS::getRawChannel(uint8_t channel) { // channel is 1-based;
+	uint8_t ch = channel-1;
+	noInterrupts();  // Maybe noInterrupts/interrupts is not needed for 32 bit MCUs...
+	uint16_t  result = _channels[ch]; 
+	interrupts();
+	return result;
+}
+
+#ifdef DEBUG_SBUS
 unsigned long SBUS::getFramesCount() { 
-  noInterrupts(); 
-  unsigned long result = _framesCount; 
-  interrupts();
-  return result;
+	noInterrupts(); 
+	unsigned long result = _framesCount; 
+	interrupts();
+	return result;
 }
 
 unsigned long SBUS::getBytesCount() { 
-  noInterrupts(); 
-  unsigned long result = _bytesCount; 
-  interrupts();
-  return result;
+	noInterrupts(); 
+	unsigned long result = _bytesCount; 
+	interrupts();
+	return result;
 }
+#endif
 
