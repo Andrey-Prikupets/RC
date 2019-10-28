@@ -2,7 +2,7 @@
 #define CONFIG_H
 #include "custom_types.h"
 
-#define VERSION_NUMBER "00"
+#define VERSION_NUMBER "01"
 
 // Comment out when OLED screen is not connected;
 #define OLED
@@ -27,6 +27,12 @@
 // Disable if Watchdog not needed or IWatchdog library not available;
 // IWatchdog - from https://github.com/stm32duino/Arduino_Core_STM32
 //#define WATCHDOG_TIME_MS 500
+
+// Enable if external watchdog DS1232 is used; comment out if not; 
+// It has 3 configurable timeouts (62.5-250ms, 250-1000ms, 500-2000ms);
+// It is recommended to set it up to 250-1000ms minimal timeout because it is refreshed in the main loop
+// and if OSD is enabled the loop time may be up to 100ms;
+#define EXTERNAL_WATCHDOG
 
 #define LOGO_DELAY_MS 1000
 

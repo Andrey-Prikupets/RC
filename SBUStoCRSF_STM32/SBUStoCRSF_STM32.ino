@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "config.h"
+#include "checkconfig.h"
 #include "debug.h"
 #include "sbus.h" 
 #include "crossfire.h"
@@ -7,32 +8,7 @@
 #include "Seq.h"
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
-
-// MCU_STM32F103C8 - Core STM32F1 from http://dan.drown.org/stm32duino/package_STM32duino_index.json
-// ARDUINO_BLUEPILL_F103C8 - Core from https://github.com/stm32duino/BoardManagerFiles/raw/master/STM32/package_stm_index.json
-// Note: Last core supports WatchDog but seems does not work;
-
-#ifndef ARDUINO_BLUEPILL_F103C8
-  #ifndef MCU_STM32F103C8 
-    #error This sketch should be flashed to STM32F1 'Blue Pill' device only. "Official" stm32duino core and "dan.drown.org"/"roger clark" core is supported;
-  #else
-    #define CORE_DAN_DROWN
-  #endif
-#else
-  #define CORE_OFFICIAL
-#endif
-
-#ifdef CORE_OFFICIAL
-    #error "Offical" STM32 Arduino core is NOT supported. Please install STM32F1 (STM32Duino.com) so called "dan.drown.org" core.
-#endif
-
-#ifdef WATCHDOG_TIME_MS
-  #ifdef CORE_OFFICIAL
-    #include <IWatchdog.h>
-  #else
-    #error Watchdog is not supported with "dan.drown.org"/"roger clark" core. Comment out #define WATCHDOG_TIME_MS in config.h; 
-  #endif
-#endif
+#include "watchdog.h"
 
 // Pins definitions;
 
@@ -41,12 +17,16 @@ const int8_t LED_PIN = PC13; // NOTE: LED in Blue Pill is inverted;
 #define LED_OFF HIGH 
 const int8_t LED_DIVIDER = 10; // LED Flasher frequency divider;
 
-const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V;
+const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V; it it safe for STM32 pin;
 const int8_t VOLTAGE_PIN = PA5; 
 
 // Voltage per cell limits for Battery Low beep and Battery Critically Low beep;
 const float LOW_VOLTAGE = 3.47f;
 const float MIN_VOLTAGE = 3.33f;
+
+#ifdef EXTERNAL_WATCHDOG
+const int8_t WATCHDOG_PIN = PC14;
+#endif
 
 // Voltage meter correction; 
 const float correction  = 0.9875; // Fine tune it by measuring real voltage and shown voltage; correction=Vreal/Vmeasured;
@@ -123,25 +103,29 @@ void initChannels();
 
 void setup() {
 #ifdef DEBUG
-  Serial.begin(DEBUG_BAUD);
+    Serial.begin(DEBUG_BAUD);
 #endif
+
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LED_ON);
+
+#ifdef EXTERNAL_WATCHDOG
+    setupExternalWatchdog(WATCHDOG_PIN);
+#endif
+
+#ifdef WATCHDOG_TIME_MS
+    setupInternalWatchdog();
+#endif
+
     initChannels();
     menuSetup();
     setupCrossfire(crossfireSerial, &crossfire);
     showLogo();
-    delay(LOGO_DELAY_MS);
-
-#ifdef CORE_OFFICIAL
-  #ifdef WATCHDOG_TIME_MS
-    IWatchdog.begin(WATCHDOG_TIME_MS*1000);
-  #endif
-#endif
+    delaySafe(LOGO_DELAY_MS);
 
     sbus.begin();  
     setupSBusTimer();
     setupCrossfireTimer();
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LED_ON);
 
     battery1.begin();
     mTimer1.start();
@@ -406,9 +390,7 @@ void loop() {
 
     menuLoop();
 
-#if defined(CORE_OFFICIAL) && defined(WATCHDOG_TIME_MS)
-    IWatchdog.reload();
-#endif
+    resetWatchdog();
 
 // Test Watchdog;
 //    if (sbus.getBytesCount() > 20000) {
@@ -416,13 +398,6 @@ void loop() {
 ///    }
 
 #ifdef DEBUG
-  #if !defined(CORE_OFFICIAL) || !defined(WATCHDOG_TIME_MS)
-    delay(1000);
-  #else
-    for (int i=0; i<1000; i++) {
-      delay(1);
-      IWatchdog.reload();
-    }
-  #endif
+    delaySafe(1000); // slow down the loop for debug monitoring;
 #endif    
 }
