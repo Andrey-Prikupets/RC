@@ -28,15 +28,11 @@ void resetExternalWatchdog() {
 #ifdef WATCHDOG_TIME_MS
 
 void setupInternalWatchdog() {
-#ifdef CORE_OFFICIAL
     IWatchdog.begin(WATCHDOG_TIME_MS*1000);
-#endif
 }
 
 void resetInternalWatchdog() {
-#ifdef CORE_OFFICIAL
     IWatchdog.reload();
-#endif
 }
 
 #endif

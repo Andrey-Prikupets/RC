@@ -9,11 +9,7 @@
 // Note: Currently Internal Watchdog is not supported;
 
 #ifdef WATCHDOG_TIME_MS
-  #ifdef CORE_OFFICIAL
-    #include <IWatchdog.h>
-  #else
-    #error Watchdog is not supported with "dan.drown.org"/"roger clark" core. Comment out #define WATCHDOG_TIME_MS in config.h; 
-  #endif
+  #include "IWatchdog2.h"
 #endif
 
 #if defined(WATCHDOG_TIME_MS) || defined(EXTERNAL_WATCHDOG)
