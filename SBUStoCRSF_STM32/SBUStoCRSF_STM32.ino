@@ -15,7 +15,6 @@
 const int8_t LED_PIN = PC13; // NOTE: LED in Blue Pill is inverted;
 #define LED_ON  LOW
 #define LED_OFF HIGH 
-const int8_t LED_DIVIDER = 10; // LED Flasher frequency divider;
 
 const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V; it it safe for STM32 pin;
 const int8_t VOLTAGE_PIN = PA5; 
@@ -25,7 +24,7 @@ const float LOW_VOLTAGE = 3.47f;
 const float MIN_VOLTAGE = 3.33f;
 
 #ifdef EXTERNAL_WATCHDOG
-const int8_t WATCHDOG_PIN = PC14;
+const int8_t WATCHDOG_PIN = PB14;
 #endif
 
 // Voltage meter correction; 
@@ -56,15 +55,19 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 // 3  8s      Battery low alert sound;
 // 4  4s      Battery min alert sound;
 // 5  500ms   Invalid channels flashing;
-TimerDelay delays[] = {200, 500, 3000, 8000, 4000, 500};
+// 6  250ms   LED normal flashing;
+// 7  50ms    LED flashing no-signal; 
+TimerDelay delays[] = {200, 500, 3000, 8000, 4000, 500, 250, 50};
 MultiTimer mTimer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
-const uint8_t TIMER_BATTERY_LOOP     = 0; 
-const uint8_t TIMER_SCREEN_UPDATE    = 1; 
-const uint8_t TIMER_NO_SBUS          = 2; 
-const uint8_t TIMER_BATTERY_LOW      = 3; 
-const uint8_t TIMER_BATTERY_MIN      = 4; 
-const uint8_t TIMER_INVALID_FLASHING = 5;
+const uint8_t TIMER_BATTERY_LOOP         = 0; 
+const uint8_t TIMER_SCREEN_UPDATE        = 1; 
+const uint8_t TIMER_NO_SBUS              = 2; 
+const uint8_t TIMER_BATTERY_LOW          = 3; 
+const uint8_t TIMER_BATTERY_MIN          = 4; 
+const uint8_t TIMER_INVALID_FLASHING     = 5;
+const uint8_t TIMER_LED_VALID_FLASHING   = 6;
+const uint8_t TIMER_LED_INVALID_FLASHING = 7;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
@@ -195,14 +198,10 @@ void setupCrossfireTimer() {
   crossfireTimer.resume();
 }
 
-void flashLED() {
+void flashLED(bool valid) {
   static byte led = LED_ON;
-  static byte led_count = 0;
 
-  // flash led;
-  led_count++;
-  if (led_count > LED_DIVIDER) {
-    led_count = 0;
+  if (mTimer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
     led = !led;
     digitalWrite(LED_PIN, led);
   }
@@ -332,11 +331,11 @@ void doPrepare(bool reset_frames) {
 #ifdef DEBUG_STD_CHANNELS
   Serial.println();  
 #endif
-    createCrossfireChannelsFrame(&crossfire, standardChannels, NUM_CHANNELS_SBUS);
-    if (reset_frames) {
-      missed_frames = 0;
-      flashLED();
-    }
+  createCrossfireChannelsFrame(&crossfire, standardChannels, NUM_CHANNELS_SBUS);
+  if (reset_frames) {
+    missed_frames = 0;
+  }
+  flashLED(reset_frames);
 }
 
 #define MAX_ALLOWED_MISSED_FRAMES 10
@@ -398,6 +397,6 @@ void loop() {
 ///    }
 
 #ifdef DEBUG
-    delaySafe(1000); // slow down the loop for debug monitoring;
+    delaySafe(10); // slow down the loop for debug monitoring;
 #endif    
 }

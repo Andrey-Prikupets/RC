@@ -32,7 +32,7 @@
 // It has 3 configurable timeouts (62.5-250ms, 250-1000ms, 500-2000ms);
 // It is recommended to set it up to 250-1000ms minimal timeout because it is refreshed in the main loop
 // and if OSD is enabled the loop time may be up to 100ms;
-#define EXTERNAL_WATCHDOG
+//#define EXTERNAL_WATCHDOG
 
 #define LOGO_DELAY_MS 1000
 

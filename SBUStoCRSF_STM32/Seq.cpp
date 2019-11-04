@@ -1,16 +1,10 @@
 #include "Seq.h"
 
-#ifdef CROSS_DEBUG
-#include "Arduino_cross.h"
-#else
-#include <Arduino.h>
-#endif
-
 Beeper::Beeper(uint8_t aPin, bool aPinIsInverted, Seq10ms aPause10Ms, uint8_t aQueueSize, Seq* aSeqs[], uint8_t aNumSeqs) :
  pin(aPin), pinIsInverted(aPinIsInverted), pauseMs(((uint16_t)aPause10Ms)*10), seqs(aSeqs), numSeqs(aNumSeqs), 
  step(0), isBeeping(false), isInPause(false) {
 	pinMode(pin, OUTPUT);
-	beep(false);
+  digitalWrite(pin, pinIsInverted != isBeeping);
 	initQueue(aQueueSize);
 }
 
@@ -30,8 +24,8 @@ uint8_t Beeper::findInQueue(uint8_t startPos, uint8_t seqIndex) {
 
 void Beeper::appendToQueue(uint8_t seqIndex) {
 	if (queueCount >= queueSize) {
-#ifdef CROSS_DEBUG
-		cout << "Overflow " << (int)seqIndex << "\n";
+#ifdef SEQ_DEBUG
+		Serial.print ("Overflow seqIndex "); Serial.println(seqIndex, DEC);
 #endif
 		return;
 	}
@@ -41,8 +35,8 @@ void Beeper::appendToQueue(uint8_t seqIndex) {
 
 void Beeper::removeFromQueue(uint8_t position) {
 	if (queueCount == 0 || position+1 > queueCount) {
-#ifdef CROSS_DEBUG
-		cout << "Underflow " << (int)position << "\n";
+#ifdef SEQ_DEBUG
+    Serial.print ("Underflow position "); Serial.println(position, DEC);
 #endif
 		return;
 	}
@@ -51,6 +45,9 @@ void Beeper::removeFromQueue(uint8_t position) {
 }
 
 void Beeper::beep(bool enable) {
+#ifdef SEQ_DEBUG
+    Serial.print(millis(), DEC); Serial.println (enable ? "; BEEP" : "; OFF");
+#endif
 #ifdef SOUND_OFF  
   isBeeping = false;
 #else
@@ -89,8 +86,11 @@ void Beeper::loop(void) {
        	uint8_t seqIndex = queue[0];
 		Seq* seq = seqs[seqIndex];
        	uint16_t delayMs = ((uint16_t)seq->data[step])*10;
-#ifdef CROSS_DEBUG
-		cout << ms << "; Beeper::loop, start play seq " << (int)seqIndex << " after pause " << " - step " << (int) step << " delay " << delayMs << "\n";
+#ifdef SEQ_DEBUG
+    Serial.print(ms, DEC); 
+    Serial.print ("; Beeper::loop, start play seq "); Serial.print(seqIndex , DEC);
+    Serial.print (" after pause - step "); Serial.print(step , DEC);
+    Serial.print (" delay "); Serial.println(delayMs , DEC);
 #endif
        	stepIsBeep = true;
        	nextTimeMs = ms+delayMs;
@@ -105,16 +105,22 @@ void Beeper::loop(void) {
 		Seq* seq = seqs[seqIndex];
 		if (step < seq->size) {
        		uint16_t delayMs = ((uint16_t)seq->data[step])*10;
-#ifdef CROSS_DEBUG
-		cout << ms << "; Beeper::loop, continue playing seq " << (int)seqIndex << " - step " << (int) step << " delay " << delayMs << "\n";
+#ifdef SEQ_DEBUG
+    Serial.print(ms, DEC); 
+    Serial.print ("; Beeper::loop, continue playing seq "); Serial.print(seqIndex , DEC);
+    Serial.print (" after pause - step "); Serial.print(step , DEC);
+    Serial.print (" delay "); Serial.println(delayMs , DEC);
 #endif
 			step++;
 	   		stepIsBeep = !stepIsBeep;
    			nextTimeMs = ms+delayMs;			
 			beep(stepIsBeep);
 		} else {
-#ifdef CROSS_DEBUG
-		cout << ms << "; Beeper::loop, finish playing seq " << (int)seqIndex << " - step " << (int) step << ", starting pause for " << pauseMs << "\n";
+#ifdef SEQ_DEBUG
+    Serial.print(ms, DEC); 
+    Serial.print ("; Beeper::loop, finish playing seq "); Serial.print(seqIndex , DEC);
+    Serial.print (" - step "); Serial.print(step , DEC);
+    Serial.print (" starting pause for "); Serial.println(pauseMs , DEC);
 #endif
 			removeFromQueue(0); // Remove finished sequence from the queue;
 			// Initiate lead-out pause;
@@ -138,8 +144,8 @@ uint8_t Beeper::findSeq(Seq* seq) {
 void Beeper::play(Seq* seq) {
 	uint8_t seqIndex = findSeq(seq);
 	if (seqIndex == NOT_FOUND) {
-#ifdef CROSS_DEBUG
-		cout << "Play: seq not found \n";
+#ifdef SEQ_DEBUG
+    Serial.println ("Play: seq not found "); 
 #endif
 		return;
 	}
@@ -165,8 +171,8 @@ void Beeper::start(uint8_t seqIndex) {
 void Beeper::stop(Seq* seq) {
 	uint8_t seqIndex = findSeq(seq);
 	if (seqIndex == NOT_FOUND) {
-#ifdef CROSS_DEBUG
-		cout << "stop: seq not found \n";
+#ifdef SEQ_DEBUG
+    Serial.println ("stop: seq not found "); 
 #endif
 		return;
 	}

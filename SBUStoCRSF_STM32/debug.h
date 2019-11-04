@@ -3,9 +3,10 @@
 //#define DEBUG_OLED_SPEED
 #define DEBUG_SBUS
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
+//#define SEQ_DEBUG
 //#define DEBUG_BATTERY
 //#define DEBUG_SBUS_RAW_CHANNELS
 //#define DEBUG_CROSSFIRE_PULSES
