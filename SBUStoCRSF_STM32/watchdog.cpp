@@ -1,5 +1,9 @@
 #include "watchdog.h"
 
+#ifdef WATCHDOG_TIME_MS
+  #include "IWatchdog2.h"
+#endif
+
 #ifdef EXTERNAL_WATCHDOG
 
 static int16_t externalWatchdogPin;
@@ -51,8 +55,8 @@ void resetWatchdog() {
 void delaySafe(uint16_t ms) {
   uint16_t minTimeMs = 0x7FFF;
 #ifdef WATCHDOG_TIME_MS
-  if (WATCHDOG_TIME_MS < minTimeMs)
-    minTimeMs = WATCHDOG_TIME_MS;
+  if (WATCHDOG_TIME_MS/2 < minTimeMs) // Min. Delay is half of WDT period for safety;
+    minTimeMs = WATCHDOG_TIME_MS/2;
 #endif
 #ifdef EXTERNAL_WATCHDOG
   if (EXTERNAL_WATCHDOG_TIME_MS < minTimeMs)

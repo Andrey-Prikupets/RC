@@ -13,6 +13,7 @@
 //#define DEBUG_CROSSFIRE_CHANNELS
 //#define DEBUG_STD_CHANNELS
 //#define DEBUG_CHANNELS
+//#define DEBUG_WDT
 #endif
 
 #define DEBUG_BAUD 115200

@@ -169,4 +169,3 @@ void IWatchdogClass::clearReset(void)
 
 // Preinstantiate Object
 IWatchdogClass IWatchdog = IWatchdogClass();
-

@@ -2,7 +2,7 @@
 #define CONFIG_H
 #include "custom_types.h"
 
-#define VERSION_NUMBER "01"
+#define VERSION_NUMBER "02"
 
 // Comment out when OLED screen is not connected;
 #define OLED
@@ -22,7 +22,7 @@
 #define CPPM_RANGE_MAX 2143
 #define SBUS_TO_CPPM_CENTER_SHIFT +3 // set to 0 if no shift is needed;
 
-#define SBUS_TIMER_PERIOD_MS 249 // Check incoming data each 249us = 4 kHz;
+#define SBUS_TIMER_PERIOD_US 249 // Check incoming data each 249us = 4 kHz;
 
 #define WATCHDOG_TIME_MS 500
 

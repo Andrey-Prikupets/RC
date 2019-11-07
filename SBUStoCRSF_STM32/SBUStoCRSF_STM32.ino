@@ -169,13 +169,13 @@ void setupSBusTimer()
   sbusTimer.pause();
 #ifdef CORE_OFFICIAL
   #define SBUS_TIMER_CHANNEL 1
-  sbusTimer.setOverflow(SBUS_TIMER_PERIOD_MS, MICROSEC_FORMAT);
+  sbusTimer.setOverflow(SBUS_TIMER_PERIOD_US, MICROSEC_FORMAT);
 //  sbusTimer.setMode(SBUS_TIMER_CHANNEL, TIMER_OUTPUT_COMPARE);
 //  sbusTimer.setCompare(SBUS_TIMER_CHANNEL, 1); // overflow might be small
   sbusTimer.attachInterrupt(SBUS_TIMER_CHANNEL, sbusProcess);
 #else
   sbusTimer.setMode(TIMER_CH1, TIMER_OUTPUTCOMPARE);
-  sbusTimer.setPeriod(SBUS_TIMER_PERIOD_MS);
+  sbusTimer.setPeriod(SBUS_TIMER_PERIOD_US);
   sbusTimer.setCompare(TIMER_CH1, 1); // overflow might be small
   sbusTimer.attachInterrupt(TIMER_CH1, sbusProcess);
 #endif
@@ -391,10 +391,9 @@ void loop() {
 
     resetWatchdog();
 
-// Test Watchdog;
-//    if (sbus.getBytesCount() > 20000) {
-///      delay(2000);
-///    }
+#ifdef DEBUG_WDT
+    if (millis() > 60000L) delay(1000); // Test Watchdog;
+#endif
 
 #ifdef DEBUG
     delaySafe(10); // slow down the loop for debug monitoring;

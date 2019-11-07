@@ -6,12 +6,6 @@
 #include "config.h"
 #include "checkconfig.h"
 
-// Note: Currently Internal Watchdog is not supported;
-
-#ifdef WATCHDOG_TIME_MS
-  #include "IWatchdog2.h"
-#endif
-
 #if defined(WATCHDOG_TIME_MS) || defined(EXTERNAL_WATCHDOG)
     #define WATCHDOG_ENABLED
 #endif
