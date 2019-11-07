@@ -74,20 +74,24 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 // 8  200ms   Channels update;
 // 9  500ms   Invalid channels flashing;
 //10  2000ms  Channels Min/Max page flip;
-TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000};
+//11  250ms   LED normal flashing;
+//12  50ms    LED flashing no-signal; 
+TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000, 250, 50};
 MultiTimer timer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
-const uint8_t TIMER_MENU_FLASHING    = 0;
-const uint8_t TIMER_MODE_SOUND       = 1;
-const uint8_t TIMER_NO_CPPM          = 2; 
-const uint8_t TIMER_BATTERY_LOOP     = 3; 
-const uint8_t TIMER_BATTERY_SCREEN   = 4; 
-const uint8_t TIMER_BATTERY_LOW      = 5; 
-const uint8_t TIMER_BATTERY_MIN      = 6; 
-const uint8_t TIMER_SCREENSAVER      = 7;
-const uint8_t TIMER_CHANNELS_SCREEN  = 8;
-const uint8_t TIMER_INVALID_FLASHING = 9;
+const uint8_t TIMER_MENU_FLASHING         = 0;
+const uint8_t TIMER_MODE_SOUND            = 1;
+const uint8_t TIMER_NO_CPPM               = 2; 
+const uint8_t TIMER_BATTERY_LOOP          = 3; 
+const uint8_t TIMER_BATTERY_SCREEN        = 4; 
+const uint8_t TIMER_BATTERY_LOW           = 5; 
+const uint8_t TIMER_BATTERY_MIN           = 6; 
+const uint8_t TIMER_SCREENSAVER           = 7;
+const uint8_t TIMER_CHANNELS_SCREEN       = 8;
+const uint8_t TIMER_INVALID_FLASHING      = 9;
 const uint8_t TIMER_CHANNELS_MIN_MAX_FLIP = 10;
+const uint8_t TIMER_LED_VALID_FLASHING    = 11;
+const uint8_t TIMER_LED_INVALID_FLASHING  = 12;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
@@ -126,14 +130,10 @@ void setup() {
     showScreenSaver();
 }
 
-void flashLED() {
-    static byte led = HIGH;
-    static byte led_count = 0;
+void flashLED(bool valid) {
+  static byte led = HIGH;
 
-  // flash led;
-  led_count++;
-  if (led_count > LED_DIVIDER) {
-    led_count = 0;
+  if (mTimer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
     led = !led;
     digitalWrite(LED_PIN, led);
   }
@@ -223,8 +223,8 @@ void doPrepare(bool reset_frames) {
 #endif
     if (reset_frames) {
       missed_frames = 0;
-      flashLED();
     }
+    flashLED(reset_frames);
 }
 
 void enableR9M(boolean enable) {

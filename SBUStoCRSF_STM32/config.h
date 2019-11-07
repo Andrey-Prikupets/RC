@@ -2,7 +2,7 @@
 #define CONFIG_H
 #include "custom_types.h"
 
-#define VERSION_NUMBER "00"
+#define VERSION_NUMBER "02"
 
 // Comment out when OLED screen is not connected;
 #define OLED
@@ -22,11 +22,16 @@
 #define CPPM_RANGE_MAX 2143
 #define SBUS_TO_CPPM_CENTER_SHIFT +3 // set to 0 if no shift is needed;
 
-#define SBUS_TIMER_PERIOD_MS 249 // Check incoming data each 249us = 4 kHz;
+#define SBUS_TIMER_PERIOD_US 249 // Check incoming data each 249us = 4 kHz;
 
-// Disable if Watchdog not needed or IWatchdog library not available;
-// IWatchdog - from https://github.com/stm32duino/Arduino_Core_STM32
-//#define WATCHDOG_TIME_MS 500
+#define WATCHDOG_TIME_MS 500
+
+// Enable if external watchdog DS1232 is used; comment out if not; 
+// It has 3 configurable timeouts (62.5-250ms, 250-1000ms, 500-2000ms);
+// It is recommended to set it up to 250-1000ms minimal timeout because it is refreshed in the main loop
+// and if OSD is enabled the loop time may be up to 100ms;
+// Note: Bootloader must have no start-up delay, otherwise ext. WDT will reset before start of the real program;
+//#define EXTERNAL_WATCHDOG
 
 #define LOGO_DELAY_MS 1000
 

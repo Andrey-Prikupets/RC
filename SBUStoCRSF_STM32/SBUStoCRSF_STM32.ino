@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "config.h"
+#include "checkconfig.h"
 #include "debug.h"
 #include "sbus.h" 
 #include "crossfire.h"
@@ -7,46 +8,24 @@
 #include "Seq.h"
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
-
-// MCU_STM32F103C8 - Core STM32F1 from http://dan.drown.org/stm32duino/package_STM32duino_index.json
-// ARDUINO_BLUEPILL_F103C8 - Core from https://github.com/stm32duino/BoardManagerFiles/raw/master/STM32/package_stm_index.json
-// Note: Last core supports WatchDog but seems does not work;
-
-#ifndef ARDUINO_BLUEPILL_F103C8
-  #ifndef MCU_STM32F103C8 
-    #error This sketch should be flashed to STM32F1 'Blue Pill' device only. "Official" stm32duino core and "dan.drown.org"/"roger clark" core is supported;
-  #else
-    #define CORE_DAN_DROWN
-  #endif
-#else
-  #define CORE_OFFICIAL
-#endif
-
-#ifdef CORE_OFFICIAL
-    #error "Offical" STM32 Arduino core is NOT supported. Please install STM32F1 (STM32Duino.com) so called "dan.drown.org" core.
-#endif
-
-#ifdef WATCHDOG_TIME_MS
-  #ifdef CORE_OFFICIAL
-    #include <IWatchdog.h>
-  #else
-    #error Watchdog is not supported with "dan.drown.org"/"roger clark" core. Comment out #define WATCHDOG_TIME_MS in config.h; 
-  #endif
-#endif
+#include "watchdog.h"
 
 // Pins definitions;
 
 const int8_t LED_PIN = PC13; // NOTE: LED in Blue Pill is inverted;
 #define LED_ON  LOW
 #define LED_OFF HIGH 
-const int8_t LED_DIVIDER = 10; // LED Flasher frequency divider;
 
-const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V;
+const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V; it it safe for STM32 pin;
 const int8_t VOLTAGE_PIN = PA5; 
 
 // Voltage per cell limits for Battery Low beep and Battery Critically Low beep;
 const float LOW_VOLTAGE = 3.47f;
 const float MIN_VOLTAGE = 3.33f;
+
+#ifdef EXTERNAL_WATCHDOG
+const int8_t WATCHDOG_PIN = PB14;
+#endif
 
 // Voltage meter correction; 
 const float correction  = 0.9875; // Fine tune it by measuring real voltage and shown voltage; correction=Vreal/Vmeasured;
@@ -76,15 +55,19 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 // 3  8s      Battery low alert sound;
 // 4  4s      Battery min alert sound;
 // 5  500ms   Invalid channels flashing;
-TimerDelay delays[] = {200, 500, 3000, 8000, 4000, 500};
+// 6  250ms   LED normal flashing;
+// 7  50ms    LED flashing no-signal; 
+TimerDelay delays[] = {200, 500, 3000, 8000, 4000, 500, 250, 50};
 MultiTimer mTimer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
-const uint8_t TIMER_BATTERY_LOOP     = 0; 
-const uint8_t TIMER_SCREEN_UPDATE    = 1; 
-const uint8_t TIMER_NO_SBUS          = 2; 
-const uint8_t TIMER_BATTERY_LOW      = 3; 
-const uint8_t TIMER_BATTERY_MIN      = 4; 
-const uint8_t TIMER_INVALID_FLASHING = 5;
+const uint8_t TIMER_BATTERY_LOOP         = 0; 
+const uint8_t TIMER_SCREEN_UPDATE        = 1; 
+const uint8_t TIMER_NO_SBUS              = 2; 
+const uint8_t TIMER_BATTERY_LOW          = 3; 
+const uint8_t TIMER_BATTERY_MIN          = 4; 
+const uint8_t TIMER_INVALID_FLASHING     = 5;
+const uint8_t TIMER_LED_VALID_FLASHING   = 6;
+const uint8_t TIMER_LED_INVALID_FLASHING = 7;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
@@ -123,25 +106,29 @@ void initChannels();
 
 void setup() {
 #ifdef DEBUG
-  Serial.begin(DEBUG_BAUD);
+    Serial.begin(DEBUG_BAUD);
 #endif
+
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LED_ON);
+
+#ifdef EXTERNAL_WATCHDOG
+    setupExternalWatchdog(WATCHDOG_PIN);
+#endif
+
+#ifdef WATCHDOG_TIME_MS
+    setupInternalWatchdog();
+#endif
+
     initChannels();
     menuSetup();
     setupCrossfire(crossfireSerial, &crossfire);
     showLogo();
-    delay(LOGO_DELAY_MS);
-
-#ifdef CORE_OFFICIAL
-  #ifdef WATCHDOG_TIME_MS
-    IWatchdog.begin(WATCHDOG_TIME_MS*1000);
-  #endif
-#endif
+    delaySafe(LOGO_DELAY_MS);
 
     sbus.begin();  
     setupSBusTimer();
     setupCrossfireTimer();
-    pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LED_ON);
 
     battery1.begin();
     mTimer1.start();
@@ -182,13 +169,13 @@ void setupSBusTimer()
   sbusTimer.pause();
 #ifdef CORE_OFFICIAL
   #define SBUS_TIMER_CHANNEL 1
-  sbusTimer.setOverflow(SBUS_TIMER_PERIOD_MS, MICROSEC_FORMAT);
+  sbusTimer.setOverflow(SBUS_TIMER_PERIOD_US, MICROSEC_FORMAT);
 //  sbusTimer.setMode(SBUS_TIMER_CHANNEL, TIMER_OUTPUT_COMPARE);
 //  sbusTimer.setCompare(SBUS_TIMER_CHANNEL, 1); // overflow might be small
   sbusTimer.attachInterrupt(SBUS_TIMER_CHANNEL, sbusProcess);
 #else
   sbusTimer.setMode(TIMER_CH1, TIMER_OUTPUTCOMPARE);
-  sbusTimer.setPeriod(SBUS_TIMER_PERIOD_MS);
+  sbusTimer.setPeriod(SBUS_TIMER_PERIOD_US);
   sbusTimer.setCompare(TIMER_CH1, 1); // overflow might be small
   sbusTimer.attachInterrupt(TIMER_CH1, sbusProcess);
 #endif
@@ -211,14 +198,10 @@ void setupCrossfireTimer() {
   crossfireTimer.resume();
 }
 
-void flashLED() {
+void flashLED(bool valid) {
   static byte led = LED_ON;
-  static byte led_count = 0;
 
-  // flash led;
-  led_count++;
-  if (led_count > LED_DIVIDER) {
-    led_count = 0;
+  if (mTimer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
     led = !led;
     digitalWrite(LED_PIN, led);
   }
@@ -348,11 +331,11 @@ void doPrepare(bool reset_frames) {
 #ifdef DEBUG_STD_CHANNELS
   Serial.println();  
 #endif
-    createCrossfireChannelsFrame(&crossfire, standardChannels, NUM_CHANNELS_SBUS);
-    if (reset_frames) {
-      missed_frames = 0;
-      flashLED();
-    }
+  createCrossfireChannelsFrame(&crossfire, standardChannels, NUM_CHANNELS_SBUS);
+  if (reset_frames) {
+    missed_frames = 0;
+  }
+  flashLED(reset_frames);
 }
 
 #define MAX_ALLOWED_MISSED_FRAMES 10
@@ -406,23 +389,13 @@ void loop() {
 
     menuLoop();
 
-#if defined(CORE_OFFICIAL) && defined(WATCHDOG_TIME_MS)
-    IWatchdog.reload();
+    resetWatchdog();
+
+#ifdef DEBUG_WDT
+    if (millis() > 60000L) delay(1000); // Test Watchdog;
 #endif
 
-// Test Watchdog;
-//    if (sbus.getBytesCount() > 20000) {
-///      delay(2000);
-///    }
-
 #ifdef DEBUG
-  #if !defined(CORE_OFFICIAL) || !defined(WATCHDOG_TIME_MS)
-    delay(1000);
-  #else
-    for (int i=0; i<1000; i++) {
-      delay(1);
-      IWatchdog.reload();
-    }
-  #endif
+    delaySafe(10); // slow down the loop for debug monitoring;
 #endif    
 }

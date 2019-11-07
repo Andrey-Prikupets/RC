@@ -1,4 +1,5 @@
 #include "BatteryMonitor.h"
+#include "watchdog.h"
 
 BatteryMonitor::BatteryMonitor(uint8_t aPin, float aLowCellVoltage, float aMinCellVoltage, float aDivider, uint8_t aFilterSize, float aPrecision) : 
   pin(aPin), divider(aDivider), filterSize(aFilterSize), precision(aPrecision), filterArray(NULL), filterIndex(0), lowVoltage(aLowCellVoltage), minVoltage(aMinCellVoltage),
@@ -33,7 +34,7 @@ bool BatteryMonitor::determineNumCells() {
 
   for (byte i=0; i<8; i++) {
     value = getVoltage();
-    delay(25);
+    delaySafe(25);
   }
   prevVoltage = currVoltage = value;
 #ifdef DEBUG_BATTERY
