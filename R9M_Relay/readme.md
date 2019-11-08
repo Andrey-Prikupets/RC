@@ -65,6 +65,7 @@ Of course, relay copter should carry also video receiver to get video from remot
 * 2 small pushbuttons;
 * 5V BEC up to 1-2A current;
 * breadboard, R9M connectors, battery connector (XT60), suitable case;
+* 5V active beeper.
 
 ## Arduino libraries used
 
