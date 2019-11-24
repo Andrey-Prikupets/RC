@@ -33,6 +33,9 @@ Built from STM32F103C8T6 Blue Pill board, optional 128x64 I2C OLED, 5V BEC, 2 ca
 * Inverter cable such as http://www.expertrc.com/en/?goods=s-bus-connection-cable
 * [DIY inverter](https://github.com/zendes/SBUS/blob/master/SBUS_inverter.jpeg)
 
+## Schematic
+![Schematic is trivial](docs/Schematic.PNG) 
+
 ## Tools needed to build
 
 * Arduino environment 1.8.9 with STM32 support - "dan.drown.org"/"roger clark" core. "Official" stm32duino core is NOT SUPPORTED.
