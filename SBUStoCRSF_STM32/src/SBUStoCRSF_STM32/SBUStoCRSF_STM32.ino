@@ -19,17 +19,9 @@ const int8_t LED_PIN = PC13; // NOTE: LED in Blue Pill is inverted;
 const int8_t BEEPER_PIN  = PB12; // 5V buzzer consumes 10mA from 3.3V; it it safe for STM32 pin;
 const int8_t VOLTAGE_PIN = PA5; 
 
-// Voltage per cell limits for Battery Low beep and Battery Critically Low beep;
-const float LOW_VOLTAGE = 3.47f;
-const float MIN_VOLTAGE = 3.33f;
-
 #ifdef EXTERNAL_WATCHDOG
 const int8_t WATCHDOG_PIN = PB14;
 #endif
-
-// Voltage meter correction; 
-const float correction  = 0.9875; // Fine tune it by measuring real voltage and shown voltage; correction=Vreal/Vmeasured;
-const float DIVIDER = (2200.0f+10000.0f)/2200.0f * correction; // Resistor divider: V+ ----| 10k |--- ADC ----| 2.2k | --- GND 
 
 // Beeper sequences;
 NEW_SEQ (SEQ_MODE_SBUS_LOST,    BEEP_MS(300), PAUSE_MS(70), BEEP_MS(200), PAUSE_MS(50), BEEP_MS(100));
@@ -312,6 +304,14 @@ bool channelValid(int16_t x) {
     return (x >= MIN_SERVO_US && x <= MAX_SERVO_US);
 }
 
+const float CPPM_CENTER = (CPPM_RANGE_MAX+CPPM_RANGE_MIN)/2.0;
+const float CPPM_HALF_RANGE = (CPPM_RANGE_MAX-CPPM_RANGE_MIN)/2.0;
+const float CRSF_CENTER = (CROSSFIRE_RANGE_MIN+CROSSFIRE_RANGE_MAX)/2.0;
+const float CRSF_HALF_RANGE = (CROSSFIRE_RANGE_MAX-CROSSFIRE_RANGE_MIN)/2.0;
+const float CRSF_HALF_RANGE_CORR = CRSF_HALF_RANGE*CPPM_TO_CRSF_EXTEND_COEFF;
+const float CRSF_CENTER_CORR = CRSF_CENTER+CPPM_TO_CRSF_CENTER_SHIFT;
+const float CPPM_TO_CRSF_CORR = CRSF_HALF_RANGE_CORR/CPPM_HALF_RANGE;
+
 void doPrepare(bool reset_frames) {
     // Mapping channels from CPPM range to CrossFire;
     int16_t standardChannels[NUM_CHANNELS_SBUS];
@@ -319,7 +319,7 @@ void doPrepare(bool reset_frames) {
   Serial.print("CHST> ");  
 #endif    
     for (uint8_t i=0; i<NUM_CHANNELS_SBUS; i++) {
-      standardChannels[i] = map(channels[i], CPPM_RANGE_MIN, CPPM_RANGE_MAX, CROSSFIRE_RANGE_MIN, CROSSFIRE_RANGE_MAX);
+      standardChannels[i] = (int16_t) round((channels[i]-CPPM_CENTER)*CPPM_TO_CRSF_CORR+CRSF_CENTER_CORR);
 #ifdef DEBUG_STD_CHANNELS
     if (i>0)
       Serial.print(" ");  

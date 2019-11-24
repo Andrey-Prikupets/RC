@@ -1,4 +1,5 @@
 #include "SBUS.h"
+#include <math.h>
 
 // flag field
 #define FLAG_CHANNEL_17  1
@@ -92,6 +93,14 @@ void SBUS::process() {
 	}
 }
 
+const float SBUS_CENTER = (SBUS_RANGE_MIN+SBUS_RANGE_MAX)/2.0;
+const float SBUS_HALF_RANGE = (SBUS_RANGE_MAX-SBUS_RANGE_MIN)/2.0;
+const float CPPM_CENTER = (CPPM_RANGE_MAX+CPPM_RANGE_MIN)/2.0;
+const float CPPM_HALF_RANGE = (CPPM_RANGE_MAX-CPPM_RANGE_MIN)/2.0;
+const float CPPM_HALF_RANGE_CORR = CPPM_HALF_RANGE*SBUS_TO_CPPM_EXTEND_COEFF;
+const float CPPM_CENTER_CORR = CPPM_CENTER+SBUS_TO_CPPM_CENTER_SHIFT;
+const float SBUS_TO_CPPM_CORR = CPPM_HALF_RANGE_CORR/SBUS_HALF_RANGE;
+
 // channels start from 1 to 18
 // SBUS has values 0..7FF = 0..2047; Middle is 1023.
 // returns value 988..2012 (cleanflight friendly)
@@ -100,7 +109,7 @@ uint16_t SBUS::getChannel(uint8_t channel) { // channel is 1-based;
 	noInterrupts(); 
 	uint16_t  result = _channels[ch]; 
 	interrupts();
-	return map(result, SBUS_RANGE_MIN, SBUS_RANGE_MAX, CPPM_RANGE_MIN+SBUS_TO_CPPM_CENTER_SHIFT, CPPM_RANGE_MAX+SBUS_TO_CPPM_CENTER_SHIFT);
+	return (uint16_t) round((result-SBUS_CENTER)*SBUS_TO_CPPM_CORR+CPPM_CENTER_CORR);
 }
 
 uint16_t SBUS::getRawChannel(uint8_t channel) { // channel is 1-based;
@@ -126,4 +135,3 @@ unsigned long SBUS::getBytesCount() {
 	return result;
 }
 #endif
-
