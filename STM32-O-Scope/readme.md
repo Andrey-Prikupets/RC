@@ -12,11 +12,12 @@
 
 ## Pins mapping
 
-TFT_DC	PB0 // RS
-TFT_CS	PB1
-TFT_RST PA2
-TFT_CLK PA5
-TFT_SDA PA7
-
-TEST_WAVE_PIN	PB6     
-analogInPin 	PA0
+| Connection    | STM32 Pin |
+| ------------- | ------------- |
+| TFT_DC	| PB0 // RS |
+| TFT_CS	| PB1       |
+| TFT_RST	| PA2       |
+| TFT_CLK	| PA5       |
+| TFT_SDA	| PA7       |
+| TEST_WAVE_PIN	| PB6	    |
+| analogInPin 	| PA0       |
