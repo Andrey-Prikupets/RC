@@ -134,6 +134,7 @@ Adafruit_ST7735 TFT = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 // Display colours
 #define BEAM1_COLOUR ST7735_GREEN
 #define BEAM2_COLOUR ST7735_RED
+#define INFO_COLOUR ST7735_BLUE
 #define GRATICULE_COLOUR 0x07FF
 #define BEAM_OFF_COLOUR ST7735_BLACK
 #define CURSOR_COLOUR ST7735_GREEN
@@ -147,12 +148,10 @@ float displayTime = 0;
 
 // Variables for the beam position
 uint16_t signalX ;
-uint16_t signalY ;
-uint16_t signalY1;
 int16_t xZoomFactor = 1;
 // yZoomFactor (percentage)
 int16_t yZoomFactor = 100; //Adjusted to get 3.3V wave to fit on screen
-int16_t yPosition = -52; // GND is screen bottom line;
+int16_t yPosition = 0; 
 
 // Startup with sweep hold off or on
 boolean triggerHeld = 0;
@@ -264,6 +263,10 @@ void setup()
   sCmd.addCommand("G",   increaseTriggerPosition);         // move trigger position Up
   sCmd.addCommand("P",   toggleTestPulseOn);               // Toggle the test pulse pin from high impedence input to square wave output.
   sCmd.addCommand("p",   toggleTestPulseOff);              // Toggle the Test pin from square wave test to high impedence input.
+  sCmd.addCommand("0",   setPreset_0);           
+  sCmd.addCommand("3.3", setPreset_3_3);           
+  sCmd.addCommand("5.0", setPreset_5_0);           
+  sCmd.addCommand("!",   refresh);           
 
   sCmd.setDefaultHandler(unrecognized);                    // Handler for command that isn't matched  (says "Unknown")
   sCmd.clearBuffer();
@@ -282,8 +285,6 @@ void setup()
   myTouch.setPrecision(PREC_EXTREME);
 #endif
 
-
-
   // The test pulse is a square wave of approx 3.3V (i.e. the STM32 supply voltage) at approx 1 kHz
   // "The Arduino has a fixed PWM frequency of 490Hz" - and it appears that this is also true of the STM32F103 using the current STM32F03 libraries as per
   // STM32, Maple and Maple mini port to IDE 1.5.x - http://forum.arduino.cc/index.php?topic=265904.2520
@@ -301,7 +302,6 @@ void setup()
   TFT.setRotation(PORTRAIT);
   myHeight   = TFT.width() ;
   myWidth  = TFT.height();
-  TFT.setTextColor(CURSOR_COLOUR, BEAM_OFF_COLOUR) ;
 #if defined TOUCH_SCREEN_AVAILABLE
   touchCalibrate();
 #endif
@@ -311,10 +311,37 @@ void setup()
 //  showGraticule();
   showCredits(); // Honourable mentions ;¬)
   delay(5000) ; //5000
-  clearTFT();
   notTriggered = true;
+  refresh();
+}
+
+void refresh() {
+  clearTFT();
   showGraticule();
   showLabels();
+  showTrace();
+}
+
+void setPreset_3_3() {
+  setPreset(400,-360);
+}
+
+void setPreset_5_0() {
+  setPreset(400,-450);
+}
+
+void setPreset_0() {
+  setPreset(100,0);
+}
+
+void setPreset(int yz, int yPos) {
+  yZoomFactor = yz;
+  yPosition = yPos;
+  refresh();
+  Serial.print("# yZoomFactor=");
+  Serial.println(yZoomFactor);
+  Serial.print("# yPosition=");
+  Serial.println(yPosition);
 }
 
 void display() {
@@ -550,18 +577,18 @@ void TFTSamplesClear (uint16_t beamColour)
 
 void TFTSamples (uint16_t beamColour)
 {
-  //calculate first sample
-  signalY =  ((myHeight * dataPoints[0 * ((endSample - startSample) / (myWidth * timeBase / 100)) + 1]) / ANALOG_MAX_VALUE) * (yZoomFactor / 100) + yPosition;
-  dataPlot[0]=signalY * 99 / 100 + 1;
+  //calculate first samples
+  float signalY = ((myHeight * dataPoints[0]) / float(ANALOG_MAX_VALUE)) * (float(yZoomFactor) / 100.0) + yPosition;
+  dataPlot[0]= (uint16_t) round(signalY);
   
   for (signalX=1 ; signalX < myWidth - 2; signalX++)
   {
     // Scale our samples to fit our screen. Most scopes increase this in steps of 5,10,25,50,100 250,500,1000 etc
     // Pick the nearest suitable samples for each of our myWidth screen resolution points
-    signalY1 = ((myHeight * dataPoints[(signalX + 1) * ((endSample - startSample) / (myWidth * timeBase / 100)) + 1]) / ANALOG_MAX_VALUE) * (yZoomFactor / 100) + yPosition ;
-    dataPlot[signalX] = signalY1 * 99 / 100 + 1;
+    uint16_t i = (uint16_t) round((signalX + 1) * ((endSample - startSample) / (myWidth * float(timeBase) / 100.0)) + 1);
+    signalY = ((myHeight * dataPoints[i]) / float(ANALOG_MAX_VALUE)) * (float(yZoomFactor) / 100.0) + yPosition ;
+    dataPlot[signalX] = (uint16_t) round(signalY);
     TFT.drawLine (  dataPlot[signalX-1], signalX, dataPlot[signalX] , signalX + 1, beamColour) ;
-    signalY = signalY1;
   }
 }
 
@@ -578,6 +605,7 @@ void sweepDelay(unsigned long sweepDelayFactor) {
 void showLabels()
 // Adopting 320x200 to 128x160
 {
+  TFT.setTextColor(INFO_COLOUR, BEAM_OFF_COLOUR) ;
   TFT.setRotation(LANDSCAPE);
   TFT.setTextSize(1);
   int y0 = 5;
@@ -601,7 +629,7 @@ void showLabels()
   TFT.print("f");
   
   TFT.setCursor(x0, y0+h);
-  TFT.print(float(1.0/100*yZoomFactor));
+  TFT.print(float(1.0*100/yZoomFactor));
   TFT.print("vd ");
   TFT.print("tB=");
   TFT.print(timeBase);
@@ -615,6 +643,7 @@ void showLabels()
   TFT.print(xZoomFactor);
   //showTime();
   TFT.setRotation(PORTRAIT);
+  TFT.setTextColor(CURSOR_COLOUR, BEAM_OFF_COLOUR) ;
 }
 
 void showTime ()
@@ -707,7 +736,6 @@ void unrecognized(const char *command) {
 }
 
 void decreaseTimebase() {
-  clearTrace();
   /*
   sweepDelayFactor =  sweepDelayFactor / 2 ;
   if (sweepDelayFactor < 1 ) {
@@ -720,63 +748,56 @@ void decreaseTimebase() {
   {
     timeBase -= 100;
   }
-  showTrace();
+  refresh();
   serial_debug.print("# Timebase=");
   serial_debug.println(timeBase);
 
 }
 
 void increaseTimebase() {
-  clearTrace();
   if (timeBase < 10000)
   {
     timeBase += 100;
   }
   //sweepDelayFactor = 2 * sweepDelayFactor ;
-  showTrace();
+  refresh();
   serial_debug.print("# Timebase=");
   serial_debug.println(timeBase);
 }
 
 void increaseZoomFactor() {
-  clearTrace();
   if ( xZoomFactor < 21) {
     xZoomFactor += 1;
   }
-  showTrace();
+  refresh();
   serial_debug.print("# Zoom=");
   serial_debug.println(xZoomFactor);
 
 }
 
 void decreaseZoomFactor() {
-  clearTrace();
   if (xZoomFactor > 1) {
     xZoomFactor -= 1;
   }
-  showTrace();
+  refresh();
   Serial.print("# Zoom=");
   Serial.println(xZoomFactor);
-  //clearTFT();
 }
 
 void increaseYZoomFactor() {
-  clearTrace();
-  if ( yZoomFactor <= 990) {
-    yZoomFactor += 10;
-  }
-  showTrace();
+  yZoomFactor = getCmdInt(yZoomFactor, 10);
+  refresh();
   serial_debug.print("# YZoom=");
   serial_debug.println(yZoomFactor);
 
 }
 
 void decreaseYZoomFactor() {
-  clearTrace();
-  if (yZoomFactor > 10) {
-    yZoomFactor -= 10;
+  yZoomFactor = getCmdInt(yZoomFactor, -10);
+  if (yZoomFactor < 1) {
+    yZoomFactor = 1;
   }
-  showTrace();
+  refresh();
   Serial.print("# YZoom=");
   Serial.println(yZoomFactor);
   //clearTFT();
@@ -815,24 +836,25 @@ void scrollLeft() {
 
 }
 
-void increaseYposition() {
+int getCmdInt(int value, int defaultStep) {
+  int aNumber;
+  char *arg;
+  arg = sCmd.next();
+  if (arg == NULL)
+    return value+defaultStep;
+  return atoi(arg);    // Converts a char string to an integer
+}
 
-  if (yPosition < myHeight ) {
-    clearTrace();
-    yPosition ++;
-    showTrace();
-  }
+void increaseYposition() {
+  yPosition= getCmdInt(yPosition, 1);
+  refresh();
   Serial.print("# yPosition=");
   Serial.println(yPosition);
 }
 
 void decreaseYposition() {
-
-  if (yPosition > -myHeight ) {
-    clearTrace();
-    yPosition --;
-    showTrace();
-  }
+  yPosition= getCmdInt(yPosition, -1);
+  refresh();
   Serial.print("# yPosition=");
   Serial.println(yPosition);
 }
@@ -1050,7 +1072,7 @@ void readTouch() {
 
 void showCredits() {
   TFT.setTextSize(1);                           // Small 26 char / line
-  //TFT.setTextColor(CURSOR_COLOUR, BEAM_OFF_COLOUR) ;
+  TFT.setTextColor(CURSOR_COLOUR, BEAM_OFF_COLOUR) ;
   TFT.setCursor(0, 20);
   TFT.print(" STM-O-Scope by Andy Hull") ;
   TFT.setCursor(0, 30);
