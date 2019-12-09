@@ -39,9 +39,6 @@
 * [STM32 BluePill Oscilloscope Case for ST7735 TFT 128x160 Display](https://www.thingiverse.com/thing:4035217)
 
 ## Pics
-![Pic.1](docs/img1.PNG)
-![Pic.2](docs/img2.PNG)
-![Pic.3](docs/img3.PNG)
-
-
-
+![Pic.1](docs/img1.jpg)
+![Pic.2](docs/img2.jpg)
+![Pic.3](docs/img3.jpg)
