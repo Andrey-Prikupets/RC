@@ -20,10 +20,6 @@ Adafruit Libraries released under their specific licenses Copyright (c) 2013 Ada
 // Be sure to use the latest version of the SPI libraries see stm32duino.com - http://stm32duino.com/viewtopic.php?f=13&t=127
 #include <SPI.h>
 
-#define PORTRAIT 0
-#define LANDSCAPE 1
-
-
 // Initialize touchscreen
 // ----------------------
 // Set the pins to the correct ones for your STM32F103 board
@@ -53,6 +49,13 @@ Adafruit Libraries released under their specific licenses Copyright (c) 2013 Ada
 #include <URTouch.h>
 URTouch  myTouch( PB12, PB13, PB14, PB15, PA8);
 #endif
+
+// #defined also in "URTouch.h";
+#define PORTRAIT 0
+#define LANDSCAPE 1
+// Override to flip the screen;
+//#define PORTRAIT 2
+//#define LANDSCAPE 3
 
 // This makes no sense.. (BUG) but if you don't actually have a touch screen, #undef it here. 
 #undef TOUCH_SCREEN_AVAILABLE
@@ -108,7 +111,7 @@ variants/generic_stm32f103c/board/board.h:#define BOARD_SPI2_SCK_PIN        PB13
 ///#define TFT_DC      PA0      //   (Green) 
 #define TFT_DC      PB0      //   (Green) 
 #define TFT_CS      PB1      //   (Orange) 
-#define TFT_RST     PA2      //   (Yellow)
+//#define TFT_RST     PA6      //   (Yellow) // TFT RST pin connected with STM32 RESET;
 
 // Hardware SPI1 on the STM32F103C8T6 *ALSO* needs to be connected and pins are as follows.
 //
@@ -120,12 +123,12 @@ variants/generic_stm32f103c/board/board.h:#define BOARD_SPI2_SCK_PIN        PB13
 
 #define TFT_LED        PA3     // Backlight 
 //#define TEST_WAVE_PIN       PB1     //PB1 PWM 500 Hz 
-#define TEST_WAVE_PIN       PB6     //PB1 PWM 500 Hz 
+#define TEST_WAVE_PIN       PA8     //PB1 PWM 500 Hz 
 
 // Create the lcd object
 ///Adafruit_ILI9341_STM TFT = Adafruit_ILI9341_STM(TFT_CS, TFT_DC, TFT_RST); // Using hardware SPI
 //Adafruit_ILI9341 TFT = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST); // Using hardware SPI
-Adafruit_ST7735 TFT = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+Adafruit_ST7735 TFT = Adafruit_ST7735(TFT_CS, TFT_DC, /*TFT_RST*/ -1);
 
 // LED - blinks on trigger events - leave this undefined if your board has no controllable LED
 // define as PC13 on the "Red/Blue Pill" boards and PD2 on the "Yellow Pill R"

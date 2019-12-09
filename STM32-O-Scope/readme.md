@@ -28,9 +28,20 @@
 | ------------- | ------------- |
 | TFT_DC	| PB0 // RS |
 | TFT_CS	| PB1       |
-| TFT_RST	| PA2       |
+| TFT_RST	| RESET     |
 | TFT_CLK	| PA5       |
 | TFT_SDA	| PA7       |
-| TEST_WAVE_PIN	| PB6	    |
+| TEST_WAVE_PIN	| PA8	    |
 | analogInPin 	| PA0       |
+
+## Case model:
+
+* [STM32 BluePill Oscilloscope Case for ST7735 TFT 128x160 Display](https://www.thingiverse.com/thing:4035217)
+
+## Pics
+![Pic.1](docs/img1.PNG)
+![Pic.2](docs/img2.PNG)
+![Pic.3](docs/img3.PNG)
+
+
 
