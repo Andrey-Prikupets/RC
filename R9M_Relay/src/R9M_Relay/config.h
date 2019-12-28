@@ -2,7 +2,11 @@
 #define CONFIG_H
 #include "custom_types.h"
 
-#define VERSION_NUMBER "05"
+#define VERSION_NUMBER "07"
+
+// Show UI in OLED and support buttons;
+// If not defined, serial commands are the only way to configure;
+#define OLED
 
 // Turn off all sounds;
 //#define SOUND_OFF

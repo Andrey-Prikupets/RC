@@ -3,6 +3,8 @@
 #include "CPPM.h"
 
 #include <EEPROM.h>
+
+#ifdef OLED
 //#include "U8glib.h"
 #include <U8g2lib.h>
 //#include <U8x8lib.h>
@@ -19,8 +21,21 @@ uint8_t menu_current = 0;
 
 boolean menuItemFlashing = false;
 
+#endif
+
+#ifndef OLED
+
+// SeralCommand -> https://github.com/kroimon/Arduino-SerialCommand.git
+#include <SerialCommand.h>
+
+SerialCommand sCmd; // Create Serial Command Object.
+
+#endif
+
 // Settings version;
 const uint8_t CURRENT_VERSION = 0x10;
+
+#ifdef OLED
 
 #define MODE_UNDEFINED 0
 #define MODE_LOGO 1
@@ -44,6 +59,8 @@ static byte menuMode = MODE_LOGO;
 #define KEY_NONE 0
 #define KEY_NEXT 1
 #define KEY_SELECT 2
+
+#endif
 
 #define CPPM_START 0
 #define CPPM_LOST 1
@@ -71,6 +88,8 @@ size_t getLength_F(const __FlashStringHelper *ifsh)
   }
   return n;
 }
+
+#ifdef OLED
 
 // Moves cursor X position - good for sequential calls;
 void drawStr_F(uint8_t x, uint8_t y, const __FlashStringHelper* s_P) {
@@ -137,6 +156,8 @@ void drawMenuItem(uint8_t i, const __FlashStringHelper* s_P, const char * s1) {
     }
 }
 
+#endif
+
 const __FlashStringHelper* getPowerStr(void) {
   if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
     switch (PXX.getPower()) {
@@ -179,6 +200,8 @@ const __FlashStringHelper* getBandStrShort(void) {
     default:           return F("FLEX 868"); // RADIO_EU_FLEX
   }
 }
+
+#ifdef OLED
 
 void prepareForDrawing(bool big_font) {
   u8g.setDrawColor(1);      
@@ -548,6 +571,16 @@ void adjust_timer(void) {
   }  
 }
 
+bool update_menu_flash_timer(void) {
+  if (timer1.isTriggered(TIMER_MENU_FLASHING)) {
+    menuItemFlashing = !menuItemFlashing;  
+    return true;
+  }
+  return false;
+}
+
+#endif // OLED
+
 void adjust_settings(void) {
   switch (radioMode) {
     case RADIO_US_FCC: PXX.setCountry(PXX_COUNTRY_US); PXX.setEUPlus(false); break;   
@@ -556,14 +589,6 @@ void adjust_settings(void) {
   }
   bool send8Ch = (radioMode == RADIO_EU_LBT) && (PXX.getPower() == 0); // 25mW 8Ch;
   PXX.setSend16Ch (!send8Ch);
-}
-
-bool update_menu_flash_timer(void) {
-  if (timer1.isTriggered(TIMER_MENU_FLASHING)) {
-    menuItemFlashing = !menuItemFlashing;  
-    return true;
-  }
-  return false;
 }
 
 void read_settings(void) {
@@ -607,16 +632,30 @@ void write_settings(void) {
   EEPROM.write(5, PXX.getSPort() ? 1 : 0);
 }
 
+#ifndef OLED
+
+void init_commands(void);
+
+#endif
+
 void menuSetup(void)
 {
+#ifdef OLED
   u8g.begin();
   pinMode(PIN_KEY_NEXT, INPUT_PULLUP);           // set pin to input with pullup
   pinMode(PIN_KEY_SELECT, INPUT_PULLUP);           // set pin to input with pullup
+#else
+  pinMode(PIN_JUMPER_SETUP, INPUT_PULLUP);           // set pin to input with pullup
+#endif
   init_settings();
   read_settings();
+  init_commands();
+#ifdef OLED
   adjust_timer();
+#endif
 }
 
+#ifdef OLED
 void showLogo(void) {
     menuMode = MODE_LOGO;
     u8g.firstPage();
@@ -681,6 +720,8 @@ void showRelay() {
 }
 #endif
 
+#endif // OLED
+
 void handleBeeps(void) {
   if (timer1.isTriggered(TIMER_MODE_SOUND)) {
     if (PXX.getModeRangeCheck()) {
@@ -694,6 +735,7 @@ void handleBeeps(void) {
 
 void menuLoop(void)
 {
+#ifdef OLED
   byte refreshMenuMode = MODE_UNDEFINED;
 
   static uint8_t last_key_code = KEY_NONE;
@@ -801,6 +843,12 @@ void menuLoop(void)
       break;
 #endif      
   }
+#endif // OLED
+
+#ifndef OLED
+  // TODO SerialCommands;
+
+#endif
 }
 
 void setCPPM_Start(void) {
@@ -856,3 +904,292 @@ bool cppmModeChanged(void) {
     }
     return false;
 }
+
+#ifndef OLED
+
+void cmd_set_mode() {
+  char *name = sCmd.next();
+  if (strcmp(name,"US"))
+    radioMode = RADIO_US_FCC;
+  else if (strcmp(name,"EU")) 
+    radioMode = RADIO_EU_LBT; 
+  else if (strcmp(name,"FLEX")) 
+    radioMode = RADIO_EU_FLEX; 
+  else {
+    Serial.print(F("#- Invalid mode (US|EU|FLEX): "));
+    Serial.print(name);
+    Serial.println();
+    return;
+  }
+  adjust_settings();
+  write_settings();
+}
+
+void cmd_get_mode() {
+  switch(radioMode) {
+    case RADIO_US_FCC: Serial.print(F("US")); break;
+    case RADIO_EU_LBT: Serial.print(F("EU")); break;
+    case RADIO_EU_FLEX: Serial.print(F("FLEX")); break;
+  }
+}
+
+void cmd_get_power() {
+  if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
+    switch (PXX.getPower()) {
+  case 0: Serial.print(F("10")); break;
+  case 1: Serial.print(F("100")); break;
+  case 2: Serial.print(F("500")); break;
+  case 3: Serial.print(F("1000")); break;
+    }
+  } else {
+    switch (PXX.getPower()) {
+  case 0: Serial.print(F("25_8ch")); break;
+  case 1: Serial.print(F("25")); break;
+  case 2: Serial.print(F("200")); break;
+  case 3: Serial.print(F("500")); break;
+    }    
+  }
+}
+
+void cmd_set_power() {
+  char *name = sCmd.next();
+  if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
+    if (strcmp(name,"10"))
+      PXX.setPower(0);
+    else if (strcmp(name,"100"))
+      PXX.setPower(1);
+    else if (strcmp(name,"500"))
+      PXX.setPower(2);
+    else if (strcmp(name,"1000"))
+      PXX.setPower(3);
+    else {
+      Serial.print(F("#- Invalid US/FLEX mode power (10|100|500|1000): "));
+      Serial.print(name);
+      Serial.println();
+      return;
+    }
+  } else {
+    if (strcmp(name,"25_8ch"))
+      PXX.setPower(0);
+    else if (strcmp(name,"25"))
+      PXX.setPower(1);
+    else if (strcmp(name,"200"))
+      PXX.setPower(2);
+    else if (strcmp(name,"500"))
+      PXX.setPower(3);
+    else {
+      Serial.print(F("#- Invalid EU mode power (25_8ch|25|200|500): "));
+      Serial.print(name);
+      Serial.println();
+      return;
+    }
+  }
+  adjust_settings();
+  write_settings();
+}
+
+void cmd_set_rx() {
+  char *val = sCmd.next();
+  if (!val) {
+    Serial.println(F("#- Receiver number missing"));
+    return;
+  }
+  PXX.setRxNum(atoi(val));
+  write_settings();
+}
+
+void cmd_get_rx() {
+  Serial.print(PXX.getRxNum());
+}
+
+void cmd_set_telem() {
+  char *name = sCmd.next();
+  if (strcmp(name,"on"))
+    PXX.setTelemetry(true);
+  else
+  if (strcmp(name,"off"))
+    PXX.setTelemetry(false);
+  else {
+    Serial.println(F("#- Invalid telemetry option (on|off): "));
+    Serial.print(name);
+    Serial.println();
+    return;
+  }
+  write_settings();
+}
+
+void cmd_get_telem() {
+  Serial.print(PXX.getTelemetry() ? F("on") : F("off"));
+}
+
+void cmd_set_sport() {
+  char *name = sCmd.next();
+  if (strcmp(name,"on"))
+    PXX.setSPort(true);
+  else
+  if (strcmp(name,"off"))
+    PXX.setSPort(false);
+  else {
+    Serial.println(F("#- Invalid S_Port option (on|off): "));
+    Serial.print(name);
+    Serial.println();
+    return;
+  }
+  write_settings();
+}
+
+void cmd_get_sport() {
+  Serial.print(PXX.getSPort()() ? F("on") : F("off"));
+}
+
+struct Variable {
+  const char *name;
+  void(*getter)();
+  void(*setter)();
+}
+
+static const Variable[] CONFIG_VARS = {
+  {"mode",       cmd_set_mode,      cmd_get_mode},
+  {"power",      cmd_set_power,     cmd_get_power},
+  {"rx",         cmd_set_rx,        cmd_get_rx},
+  {"telem",      cmd_set_telem,     cmd_get_telem},
+  {"sport",      cmd_set_sport,     cmd_get_sport}
+}
+
+#define CONFIG_VARS_NUM (sizeof(CONFIG_VARS) / sizeof(Variable))
+
+void cmd_set_get(bool set) {
+  char *name = sCmd.next();
+  for (int i=0; i<CONFIG_VARS_NUM; i++) {
+    if (strcmp(name, CONFIG_VARS[i].name) == 0) {
+      void(*f)() = set ? CONFIG_VARS[i].setter : CONFIG_VARS[i].getter;
+      if (!f) {
+       Serial.print(set ? F("#- Variable is not writable: ") : F("#- Variable is not readable: "));
+       Serial.println(name);
+      } else {
+        if (!set) {
+          Serial.print("# ");
+          Serial.print(name);
+          Serial.print("=");
+          f();
+          Serial.println();
+        } else {
+          f();
+        }
+      }
+      return;
+    }
+  }
+  Serial.print(F("#- Unknown variable: "));
+  Serial.println(name);
+}
+
+void cmd_set() {
+  cmd_set_get(true);
+}
+
+void cmd_get() {
+  cmd_set_get(false);
+}
+
+void cmd_dump() {
+  Serial.println(F("# Dump:"));
+  for (int i=0; i<CONFIG_VARS_NUM; i++) {
+    void(*f)() = CONFIG_VARS[i].getter;
+    if (!f)
+      continue;
+    f();
+  }
+}
+
+status void(*periodic_func)(bool) = NULL;
+
+void handlePeriodic() {
+  if (periodic_func)
+    periodic_func(true);
+}
+
+void cmd_periodic(void(*f)(bool), bool isPeriodicOnly) {
+  char *arg = sCmd.next();
+  if (!arg || !strlen(arg)) {
+    if (isPeriodicOnly) {
+      Serial.println(F("#- This command requires on/off parameter."));
+    }
+    f(true);
+    return;
+  }
+  if (strcmp(arg, "on") == 0) {
+    if (periodic_func) {
+      Serial.print(periodic_func == f ? F("#- This process is already running.") : F("#- Other process is already running."));
+      return;
+    }
+    f(true);
+    periodic_func = f;
+  }
+  if (strcmp(arg, "off") == 0) {
+    if (!periodic_func) {
+      Serial.print(F("#- No process is running."));
+      return;
+    }
+    if (periodic_func != f) {
+      Serial.print(F("#- Other process is running."));
+      return;
+    }
+    f(false);
+    periodic_func = NULL;
+  }
+  Serial.print(F("#- Not on/off parameter: "));
+  Serial.println(arg);
+}
+
+void handle_status(bool active) {
+  if (!active)
+    return;
+  Serial.println(F("# Status:"));
+  // TODO
+}
+
+void cmd_status() { cmd_periodic(handle_status, false); }
+
+void handle_channels(bool active) {
+  if (!active)
+    return;
+  Serial.println(F("# Channels:"));
+  // TODO
+} 
+
+void cmd_channels() { cmd_periodic(handle_channels, false); }
+
+void handle_bind(bool active) {
+  PXX.setModeBind(active);
+  Serial.println(active ? F("# Binding...") : F("# Bind finished."));
+} 
+
+void cmd_bind() { cmd_periodic(handle_bind, true); }
+
+void handle_rangecheck(bool active) {
+  PXX.setModeBind(active);
+  Serial.println(active ? F("# Range checking...") : F("# Range check finished."));
+} 
+
+void cmd_rangecheck() { cmd_periodic(handle_rangecheck, true); }
+
+void unrecognized(const char *command) {
+  Serial.print(F("#- Unknown Command: "));
+  Serial.println(command);
+}
+
+void init_commands(void) {
+  sCmd.addCommand("set", cmd_set); // set <value> <value>
+  sCmd.addCommand("get", cmd_get); // get <variable>
+  sCmd.addCommand("dump", cmd_dump);
+  sCmd.addCommand("status", cmd_status); // status | status on | status off
+  sCmd.addCommand("channels", cmd_channels); // channels | channels on | channels off
+  sCmd.addCommand("bind", cmd_bind); // bind on | bind off
+  sCmd.addCommand("rangecheck", cmd_rangecheck); // rangecheck on | rangecheck off
+
+  sCmd.setDefaultHandler(unrecognized);	// Handler for command that isn't matched  (says "Unknown")
+  sCmd.clearBuffer();
+}
+
+#endif

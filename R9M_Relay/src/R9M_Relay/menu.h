@@ -19,17 +19,31 @@
 
 // Configurable parameters;
 #define MAX_RX_NUM 10 // Up to 255(?), but bigger number requires longer scrolling through RX number menu;
+
+#ifdef OLED
+
 #define BOUNCE_TICK 30 // Delay for keypress settling;
 
 // Configurable pins;
 #define PIN_KEY_NEXT 11
 #define PIN_KEY_SELECT 10
 
+#else
+
+#define PIN_JUMPER_SETUP 10
+
+#endif
+
 void menuSetup(void);
 void menuLoop(void);
+
+#ifdef OLED
+
 void showLogo(void);
 void showScreenSaver(void);
 void showChannels(void);
+
+#endif
 
 void setCPPM_Start(void);
 void setCPPM_Obtained(void);
