@@ -105,7 +105,9 @@ void setup() {
   Serial.begin(115200);
 #endif
     menuSetup();
+#ifdef OLED    
     showLogo();
+#endif    
     delay(2500);
     CPPM.begin();
 #ifndef DEBUG
@@ -127,13 +129,15 @@ void setup() {
       case 3: beeper1.play(&SEQ_BATTERY_3S); break;
       case 4: beeper1.play(&SEQ_BATTERY_4S); break;
     }
+#ifdef OLED    
     showScreenSaver();
+#endif    
 }
 
 void flashLED(bool valid) {
   static byte led = HIGH;
 
-  if (mTimer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
+  if (timer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
     led = !led;
     digitalWrite(LED_PIN, led);
   }

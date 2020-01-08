@@ -6,7 +6,7 @@
 
 // Show UI in OLED and support buttons;
 // If not defined, serial commands are the only way to configure;
-#define OLED
+//#define OLED
 
 // Turn off all sounds;
 //#define SOUND_OFF
@@ -21,7 +21,7 @@
 //#define EMIT_CPPM
 
 // Enable to support RELAY mode;
-//#define RELAY
+#define RELAY
 
 #define RELAY_CHANNEL    CH7  // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
 

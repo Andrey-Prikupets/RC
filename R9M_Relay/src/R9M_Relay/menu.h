@@ -32,7 +32,7 @@
 
 #define PIN_JUMPER_SETUP 10
 
-#endif
+#endif // #ifdef OLED
 
 void menuSetup(void);
 void menuLoop(void);
@@ -43,7 +43,7 @@ void showLogo(void);
 void showScreenSaver(void);
 void showChannels(void);
 
-#endif
+#endif // #ifdef OLED
 
 void setCPPM_Start(void);
 void setCPPM_Obtained(void);

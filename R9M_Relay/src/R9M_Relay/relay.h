@@ -43,6 +43,17 @@ extern Beeper beeper1;
     #error "GPS_MODE_CHANNEL must not be same as RELAY_CHANNEL"
 #endif
 
+extern bool    relayEnabled;
+extern uint8_t relayChannel;     // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
+extern uint8_t gpsModeChannel;   // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
+extern uint16_t gpsHoldValue;    // Set it to enable GPS HOLD in GPS_MODE_CHANNEL on both relay and mission drone;
+
+// RELAY_CHANNEL signal boundaries to enable PXX or CPPM control;
+extern uint16_t activePXX_Min;   // Min. value for make PXX control active;
+extern uint16_t activePXX_Max;   // Max. value for make PXX control active;
+extern uint16_t activeCPPM_Min;  // Min. value for make CPPM control active;
+extern uint16_t activeCPPM_Max;  // Max. value for make CPPM control active;
+
 #endif // #ifdef RELAY
 
 #endif // #ifndef RELAY_H
