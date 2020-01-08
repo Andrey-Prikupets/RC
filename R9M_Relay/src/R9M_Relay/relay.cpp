@@ -2,7 +2,7 @@
 
 #ifdef RELAY
 
-bool    relayEnabled = false;
+bool    relayEnabled = RELAY_ENABLED;
 uint8_t relayChannel = RELAY_CHANNEL;      // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
 uint8_t gpsModeChannel = GPS_MODE_CHANNEL; // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
 uint16_t gpsHoldValue = GPS_HOLD_VALUE;    // Set it to enable GPS HOLD in GPS_MODE_CHANNEL on both relay and mission drone;
@@ -54,11 +54,11 @@ void dumpChannels(int16_t channels[], int8_t size) {
 #endif
 
 void updateChannelsRelay(int16_t channels[]) {
-  uint16_t value = channels[RELAY_CHANNEL];
-  if (value >= ACTIVE_PXX_MIN && value <= ACTIVE_PXX_MAX) {
+  uint16_t value = channels[relayChannel];
+  if (relayEnabled && (value >= activePXX_Min && value <= activePXX_Max)) {
     setRelayActive(RELAY_ACTIVE_PXX);
   } else
-  if (value >= ACTIVE_CPPM_MIN && value <= ACTIVE_CPPM_MAX) {
+  if (relayEnabled && (value >= activeCPPM_Min && value <= activeCPPM_Max)) {
     setRelayActive(RELAY_ACTIVE_CPPM);
   } else {
     setRelayActive(RELAY_ACTIVE_NONE);
@@ -71,11 +71,11 @@ void updateChannelsRelay(int16_t channels[]) {
     memcpy(channels_out_cppm, channels, NUM_CHANNELS_CPPM*sizeof(channels[0]));  
   }
 
-  if (active != RELAY_ACTIVE_PXX) {
-    channels_out_pxx[GPS_MODE_CHANNEL] = GPS_HOLD_VALUE;
+  if (relayEnabled && active != RELAY_ACTIVE_PXX) {
+    channels_out_pxx[gpsModeChannel] = gpsHoldValue;
   }
-  if (active != RELAY_ACTIVE_CPPM) {
-    channels_out_cppm[GPS_MODE_CHANNEL] = GPS_HOLD_VALUE;
+  if (relayEnabled && active != RELAY_ACTIVE_CPPM) {
+    channels_out_cppm[gpsModeChannel] = gpsHoldValue;
   }
   channelsInitialized = true;
 

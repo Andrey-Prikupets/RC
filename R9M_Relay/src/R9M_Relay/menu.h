@@ -30,7 +30,9 @@
 
 #else
 
-#define PIN_JUMPER_SETUP 10
+#define PIN_JUMPER_SETUP 12
+
+void setCliActive(bool value);
 
 #endif // #ifdef OLED
 
@@ -63,6 +65,7 @@ extern const uint8_t TIMER_INVALID_FLASHING;
 #ifdef RC_MIN_MAX
 extern const uint8_t TIMER_CHANNELS_MIN_MAX_FLIP;
 #endif
+extern const uint8_t TIMER_CLI_PERIODIC;
 
 extern Seq SEQ_MODE_RANGE_CHECK;
 extern Seq SEQ_MODE_BIND;

@@ -8,6 +8,8 @@
 // If not defined, serial commands are the only way to configure;
 //#define OLED
 
+#define CLI_BAUD  115200
+
 // Turn off all sounds;
 //#define SOUND_OFF
 
@@ -23,6 +25,11 @@
 // Enable to support RELAY mode;
 #define RELAY
 
+#ifdef OLED
+#define RELAY_ENABLED    true // Relay mode is enabled by default if no CLI is available;
+#else
+#define RELAY_ENABLED    false // Relay mode is enabled by default if CLI is available;
+#endif
 #define RELAY_CHANNEL    CH7  // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
 
 #define GPS_MODE_CHANNEL CH8  // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;

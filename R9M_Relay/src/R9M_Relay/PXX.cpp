@@ -28,6 +28,7 @@ void PXX_Class::crc( uint8_t data )
     pcmCrc=(pcmCrc<<8) ^ CRCTable((pcmCrc>>8)^data) ;
 }
 
+#ifndef DEBUG
 void USART_Init(long baud)
 {
     int _baud = (16000000 / (2 * baud)) - 1;
@@ -55,17 +56,28 @@ void USART_Send(uint8_t data) {
     //Wait for the buffer to be empty
     while ( !( UCSR0A & (1<<UDRE0)) );
 }
+#endif
 
 void PXX_Class::begin()
 {
+#ifndef DEBUG
 // 125000; 0=8; 1=8/16; SUM = 16/24;
 // 133333; 0=7.5, 1=7.5/15
 // 150000; 0=6.6, 1=6.6/13.25;
 // Hourus; 0=10.1,1=5.87/13.84; SUM=15.8/23.84;
   USART_Init(125000); // 125000
+#else
+  Serial.println(F("PXX.begin"));
+#endif  
   framesCountBeforeFailSafe = 0;
   refreshFlag1();
   refreshExtraFlags();
+  initialized = true;
+}
+
+void PXX_Class::end()
+{
+  initialized = false;
 }
 
 void PXX_Class::putPcmSerialBit(uint8_t bit)
@@ -260,11 +272,14 @@ void PXX_Class::refreshExtraFlags() {
 
 void PXX_Class::send()
 {
-    for(int i = 0; i < length; i++)
-    {
-      USART_Send(pulses[i]);
+    if (initialized) {
+      for(int i = 0; i < length; i++)
+      {
+#ifndef DEBUG
+        USART_Send(pulses[i]);
+#endif        
+      }
     }
-
     sendUpperChannels = send16ch ? !sendUpperChannels : 0;
 }
 
