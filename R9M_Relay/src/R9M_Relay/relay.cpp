@@ -2,7 +2,7 @@
 
 #ifdef RELAY
 
-bool    relayEnabled = RELAY_ENABLED;
+bool relayEnabled = RELAY_ENABLED;
 uint8_t relayChannel = RELAY_CHANNEL;      // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
 uint8_t gpsModeChannel = GPS_MODE_CHANNEL; // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
 uint16_t gpsHoldValue = GPS_HOLD_VALUE;    // Set it to enable GPS HOLD in GPS_MODE_CHANNEL on both relay and mission drone;
@@ -19,6 +19,11 @@ int16_t channels_out_cppm[NUM_CHANNELS_CPPM] = { 1500,1500,1000,1500,1200,1400,1
 static int8_t active = RELAY_ACTIVE_NONE;
 static int8_t oldActive = RELAY_ACTIVE_NONE;
 static bool channelsInitialized = false;
+
+void relayInit() {
+  pinMode(PIN_CAMERA_PXX, OUTPUT);
+  digitalWrite(PIN_CAMERA_PXX, CAMERA_CPPM);
+}
 
 int8_t getRelayActive() {
   return active;
@@ -71,12 +76,16 @@ void updateChannelsRelay(int16_t channels[]) {
     memcpy(channels_out_cppm, channels, NUM_CHANNELS_CPPM*sizeof(channels[0]));  
   }
 
-  if (relayEnabled && active != RELAY_ACTIVE_PXX) {
-    channels_out_pxx[gpsModeChannel] = gpsHoldValue;
+  if (relayEnabled) {
+    if (active != RELAY_ACTIVE_PXX) {
+      channels_out_pxx[gpsModeChannel] = gpsHoldValue;
+    }
+    if (active != RELAY_ACTIVE_CPPM) {
+      channels_out_cppm[gpsModeChannel] = gpsHoldValue;
+    }
+    digitalWrite(PIN_CAMERA_PXX, active == RELAY_ACTIVE_CPPM ? CAMERA_CPPM : CAMERA_PXX);
   }
-  if (relayEnabled && active != RELAY_ACTIVE_CPPM) {
-    channels_out_cppm[gpsModeChannel] = gpsHoldValue;
-  }
+
   channelsInitialized = true;
 
 #ifdef DEBUG_RELAY

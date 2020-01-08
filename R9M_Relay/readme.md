@@ -27,6 +27,9 @@ Active copter is directly controlled by pilot, Inactive goes to GPSHOLD mode. If
 RELAY feature can be enabled by define RELAY in config.h, below there are parameters that should be configured accordingly.
 Of course, relay copter should carry also video receiver to get video from remote copter and video transmitter to send it down to the pilot.
 
+The device can control camera switch IC or relay via output D6 (PIN_CAMERA_PXX). If RELAY feature is disabled of 1st copter (relay copter) is controlled, the pin has HIGH.
+If 2nd copter (remote copter) is controlled, or both copters are uncontrolled in GPSHOLD mode, the pin has LOW.
+
 ```C
 // Enable to support RELAY mode;
 #define RELAY

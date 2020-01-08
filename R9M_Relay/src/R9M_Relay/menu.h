@@ -30,6 +30,7 @@
 
 #else
 
+// Configurable pins;
 #define PIN_JUMPER_SETUP 12
 
 void setCliActive(bool value);
