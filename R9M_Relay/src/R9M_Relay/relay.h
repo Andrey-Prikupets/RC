@@ -9,15 +9,11 @@
 
 #ifdef RELAY
 
-// Configurable pins;
-#define PIN_CAMERA_PXX 6
-
-#define CAMERA_PXX  LOW
-#define CAMERA_CPPM HIGH
-
 #define RELAY_ACTIVE_NONE 0
 #define RELAY_ACTIVE_PXX  1
 #define RELAY_ACTIVE_CPPM 2
+
+void relayInit();
 
 int8_t getRelayActive();
 

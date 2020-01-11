@@ -21,8 +21,8 @@ static int8_t oldActive = RELAY_ACTIVE_NONE;
 static bool channelsInitialized = false;
 
 void relayInit() {
-  pinMode(PIN_CAMERA_PXX, OUTPUT);
-  digitalWrite(PIN_CAMERA_PXX, CAMERA_CPPM);
+  pinMode(PIN_CAMERA_SEL, OUTPUT);
+  digitalWrite(PIN_CAMERA_SEL, CAMERA_CPPM);
 }
 
 int8_t getRelayActive() {
@@ -83,7 +83,7 @@ void updateChannelsRelay(int16_t channels[]) {
     if (active != RELAY_ACTIVE_CPPM) {
       channels_out_cppm[gpsModeChannel] = gpsHoldValue;
     }
-    digitalWrite(PIN_CAMERA_PXX, active == RELAY_ACTIVE_CPPM ? CAMERA_CPPM : CAMERA_PXX);
+    digitalWrite(PIN_CAMERA_SEL, active == RELAY_ACTIVE_CPPM ? CAMERA_CPPM : CAMERA_PXX); // If both CPPM and PXX copters are inacive, select PXX camera;
   }
 
   channelsInitialized = true;

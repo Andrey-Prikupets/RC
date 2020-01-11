@@ -24,16 +24,10 @@
 
 #define BOUNCE_TICK 30 // Delay for keypress settling;
 
-// Configurable pins;
-#define PIN_KEY_NEXT 11
-#define PIN_KEY_SELECT 10
-
 #else
 
-// Configurable pins;
-#define PIN_JUMPER_SETUP 12
-
 void setCliActive(bool value);
+bool isCliActive();
 
 #endif // #ifdef OLED
 

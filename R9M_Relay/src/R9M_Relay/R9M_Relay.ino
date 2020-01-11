@@ -9,19 +9,9 @@
 #include "BatteryMonitor.h"
 #include "relay.h"
 
-const int LED_PIN = 13;
-const int LED_DIVIDER = 10;
+const int LED_DIVIDER = 10; // Arduino board LED flashing period divider;
 
-const int BEEPER_PIN = 7;
-const int VOLTAGE_PIN = A3;
-const int R9M_POWER_PIN = 3;
-
-#define R9M_POWER_OFF HIGH
-#define R9M_POWER_ON  LOW
-
-const float LOW_VOLTAGE = 3.47f;
-const float MIN_VOLTAGE = 3.33f;
-const float correction  = 0.947f;
+// Voltage divider;
 const float DIVIDER = (680.0f+10000.0f)/680.0f * correction; // Resistor divider: V+ ----| 10k |--- ADC ----| 680 | --- GND 
 
 NEW_SEQ (SEQ_KEY_NEXT,          BEEP_MS(30));
@@ -107,11 +97,14 @@ void setup() {
   Serial.begin(DEBUG_BAUD);
   Serial.println(F("DEBUG"));
 #endif
+#ifdef RELAY
+    relayInit();
+#endif    
     menuSetup();
 #ifdef OLED    
     showLogo();
 #endif    
-    delay(2500);
+    delay(500);
     CPPM.begin();
 #ifdef OLED
     PXX.begin(); // When CLI is defined, handleCli handles PXX.begin;
@@ -239,7 +232,7 @@ void enableR9M(boolean enable) {
     UNDEFINED=0, R9M_ENABLED=1, R9M_DISABLED=2  
   };
   static uint8_t state = UNDEFINED;
-  uint8_t newState = enable ? R9M_ENABLED : R9M_DISABLED;
+  uint8_t newState = enable && !isCliActive() ? R9M_ENABLED : R9M_DISABLED;
   if (state != newState) {
 #ifndef DEBUG
     digitalWrite(R9M_POWER_PIN, newState == R9M_ENABLED ? R9M_POWER_ON : R9M_POWER_OFF);
@@ -255,12 +248,6 @@ void enableR9M(boolean enable) {
 void handleCLI() {
   static bool initialized = false;
   bool enabled = !digitalRead(PIN_JUMPER_SETUP); // LOW = enabled;
-#ifdef DEBUG
-//   Serial.print(F("enabled "));
-//   Serial.print(enabled, DEC);
-//   Serial.print(F(", started "));
-//   Serial.println(PXX.isStarted(), DEC);
-#endif
   if (enabled != !PXX.isStarted() || !initialized) {
     initialized = true;
     if (enabled) {

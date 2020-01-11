@@ -385,11 +385,11 @@ void drawScreenSaver() {
 
   const __FlashStringHelper* s;
   switch (cppm_state) {
-  case CPPM_START: s = F("CPPM: Wait");
+  case CPPM_START: s = F("RX: Wait");
        break;
-  case CPPM_OBTAINED: s = F("CPPM: OK");
+  case CPPM_OBTAINED: s = F("RX: OK");
        break;
-  default: s = F("CPPM: Lost"); // CPPM_LOST
+  default: s = F("RX: Lost"); // CPPM_LOST
        break;
   }
   drawStr_F(MENU_LEFT, y, s); 
@@ -902,6 +902,10 @@ void menuLoop(void)
 void setCliActive(bool value) {
   cliActive = value;
 }
+
+bool isCliActive() {
+  return cliActive;
+}
 #endif
 
 void setCPPM_Start(void) {
@@ -1126,14 +1130,14 @@ bool readChannelNumber(uint8_t& channelVar) {
     Serial.println(F("#- Channel name should be CH5 to CH8"));
     return false;
   }
-  channelVar = channel;
+  channelVar = channel-1;
   write_settings();
   return true;
 }
 
 void printChannelNumber(uint8_t channel) {
   Serial.print(F("CH"));  
-  Serial.print(channel, DEC);  
+  Serial.print(channel+1, DEC);  
 }
 
 bool readChannelValue(uint16_t& valueVar) {
@@ -1347,11 +1351,11 @@ void handle_status(bool active) {
 
   const __FlashStringHelper* s;
   switch (cppm_state) {
-  case CPPM_START: s = F("CPPM: Wait");
+  case CPPM_START: s = F("RX: Wait");
        break;
-  case CPPM_OBTAINED: s = F("CPPM: OK");
+  case CPPM_OBTAINED: s = F("RX: OK");
        break;
-  default: s = F("CPPM: Lost"); // CPPM_LOST
+  default: s = F("RX: Lost"); // CPPM_LOST
        break;
   }
   Serial.print(s);
@@ -1373,7 +1377,7 @@ void handle_status(bool active) {
   if (relayEnabled) {
     switch (getRelayActive()) {
       case RELAY_ACTIVE_PXX: s = F("PXX");  break;
-      case RELAY_ACTIVE_CPPM: s = F("PPM"); break; 
+      case RELAY_ACTIVE_CPPM: s = F("CPPM"); break; 
       default: s = F("---");
     }
     Serial.println(s);
