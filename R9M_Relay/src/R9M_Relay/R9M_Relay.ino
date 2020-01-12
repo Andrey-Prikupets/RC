@@ -8,6 +8,7 @@
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
 #include "relay.h"
+#include "VRx_Rssi.h"
 
 const int LED_DIVIDER = 10; // Arduino board LED flashing period divider;
 
@@ -97,8 +98,15 @@ void setup() {
   Serial.begin(DEBUG_BAUD);
   Serial.println(F("DEBUG"));
 #endif
+
+  // All analog inputs (Battery voltage and VRx RSSI) use internal analog reference 1.1v;
+  analogReference(INTERNAL); // 1100mV = 1023; built-in reference, equal to 1.1 volts on the ATmega168 or ATmega328P;
+
 #ifdef RELAY
     relayInit();
+#endif
+#ifdef SHOW_RSSI
+    setup_VRx_Rssi();
 #endif    
     menuSetup();
 #ifdef OLED    

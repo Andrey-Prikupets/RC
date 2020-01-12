@@ -2,6 +2,7 @@
 #include "menu.h"
 #include "PXX.h"
 #include "CPPM.h"
+#include "VRx_Rssi.h"
 
 #include <EEPROM.h>
 
@@ -37,7 +38,7 @@ static bool cliActive = false;
 #endif // #ifndef OLED
 
 // Settings version;
-const uint8_t CURRENT_VERSION = 0x11;
+const uint8_t CURRENT_VERSION = 0x12;
 
 #ifdef OLED
 
@@ -622,6 +623,11 @@ void read_settings(void) {
   EEPROM.get(15, activeCPPM_Min);
   EEPROM.get(17, activeCPPM_Max);
 #endif
+
+#ifdef SHOW_RSSI
+  EEPROM.get(19, vrx_rssi_min);
+  EEPROM.get(21, vrx_rssi_max);  
+#endif
 }
 
 void init_settings(void) {
@@ -649,6 +655,11 @@ void init_settings(void) {
   activeCPPM_Min = ACTIVE_CPPM_MIN; // Min. value for make CPPM control active;
   activeCPPM_Max = ACTIVE_CPPM_MAX; // Max. value for make CPPM control active;
 #endif  
+
+#ifdef SHOW_RSSI
+  vrx_rssi_min = VRX_RSSI_MIN;
+  vrx_rssi_max = VRX_RSSI_MAX;
+#endif
 }
 
 void write_settings(void) {
@@ -669,6 +680,11 @@ void write_settings(void) {
   EEPROM.put(15, activeCPPM_Min);
   EEPROM.put(17, activeCPPM_Max);
 #endif  
+
+#ifdef SHOW_RSSI
+  EEPROM.put(19, vrx_rssi_min);
+  EEPROM.put(21, vrx_rssi_max);  
+#endif
 }
 
 #ifndef OLED
@@ -1175,6 +1191,31 @@ void cmd_get_activeCPPM_Max() { Serial.print(activeCPPM_Max, DEC); }
 
 #endif
 
+#ifdef SHOW_RSSI
+
+bool readADCValue(int& valueVar) {
+  char *name = sCmd.next();
+  if (!name) {
+    Serial.println(F("#- ADC value missing"));
+    return false;
+  }
+  int value = atoi(name);
+  if (value < 0 || value > 1023) {
+    Serial.println(F("#- ADC value should be in range [0..1023]"));
+    return false;
+  }
+  valueVar = value;
+  write_settings();
+  return true;
+}
+
+bool cmd_set_vrx_rssi_min()  { return readADCValue(vrx_rssi_min); }
+void cmd_get_vrx_rssi_min()  { Serial.print(vrx_rssi_min, DEC); }
+bool cmd_set_vrx_rssi_max()  { return readADCValue(vrx_rssi_max); }
+void cmd_get_vrx_rssi_max()  { Serial.print(vrx_rssi_max, DEC); }
+
+#endif
+
 struct Variable {
   const char *name;
   bool(*setter)();
@@ -1195,6 +1236,10 @@ static const char PROGMEM HELP_activePXX_Min[] = "Min. value in relay_channel to
 static const char PROGMEM HELP_activePXX_Max[] = "Max. value in relay_channel to make mission(PXX) drone active [900..2100]";
 static const char PROGMEM HELP_activeCPPM_Min[] = "Min. value in relay_channel to make relay(CPPM) drone active [900..2100]";
 static const char PROGMEM HELP_activeCPPM_Max[] = "Max. value in relay_channel to make relay(CPPM) drone active [900..2100]";
+#ifdef SHOW_RSSI
+static const char PROGMEM HELP_vrx_rssi_min[] = "Min. ADC value for for Video RX Rssi (0%) [0..1023]";
+static const char PROGMEM HELP_vrx_rssi_max[] = "Max. ADC value for for Video RX Rssi (100%) [0..1023]";
+#endif
 
 static Variable CONFIG_VARS[] = {
    {"R9_mode",          cmd_set_mode,           cmd_get_mode,           FPSTR(HELP_mode)}
@@ -1202,6 +1247,10 @@ static Variable CONFIG_VARS[] = {
   ,{"R9_rx",            cmd_set_rx,             cmd_get_rx,             FPSTR(HELP_rx)}
   ,{"R9_telem",         cmd_set_telem,          cmd_get_telem,          FPSTR(HELP_telem)}
   ,{"R9_sport",         cmd_set_sport,          cmd_get_sport,          FPSTR(HELP_sport)}
+#ifdef SHOW_RSSI
+  ,{"vrx_rssi_min",     cmd_set_vrx_rssi_min,   cmd_get_vrx_rssi_min,   FPSTR(HELP_vrx_rssi_min)}
+  ,{"vrx_rssi_max",     cmd_set_vrx_rssi_max,   cmd_get_vrx_rssi_max,   FPSTR(HELP_vrx_rssi_max)}
+#endif
 #ifdef RELAY
   ,{"relay_enabled",    cmd_set_relayEnabled,   cmd_get_relayEnabled,   FPSTR(HELP_relayEnabled)}
   ,{"relay_channel",    cmd_set_relayChannel,   cmd_get_relayChannel,   FPSTR(HELP_relayChannel)}
@@ -1339,6 +1388,9 @@ void handle_status(bool active) {
 #ifdef RELAY
   Serial.print(F("RELAY "));
 #endif  
+#ifdef SHOW_RSSI
+  Serial.print(F("SHOW_RSSI "));
+#endif
   Serial.println();
 
   char buf[5];
@@ -1440,6 +1492,21 @@ void handle_rangecheck(bool active) {
 
 void cmd_rangecheck() { cmd_periodic(handle_rangecheck, true); }
 
+#ifdef SHOW_RSSI
+void handle_vrx_rssi(bool active) {
+  if (!active)
+    return;
+    
+  Serial.print(F("# VRx RSSI: "));
+  Serial.print(getVRx_Rssi(), DEC);
+  Serial.print(F("% ["));
+  Serial.print(getVRx_Rssi_raw(), DEC);
+  Serial.println("]");
+} 
+
+void cmd_vrx_rssi() { cmd_periodic(handle_vrx_rssi, false); }
+#endif
+
 void cmd_reset() {  
   init_settings();
   write_settings();
@@ -1455,6 +1522,9 @@ void cmd_help() {
   Serial.println(F("channels [on|off]      ; show channel values [periodically]"));
   Serial.println(F("bind on|off            ; turn BIND mode on|off"));
   Serial.println(F("rangecheck on|off      ; turn RangeCheck on|off"));
+#ifdef SHOW_RSSI
+  Serial.println(F("vrx_rssi on|off        ; show VRx RSSI [periodically]"));
+#endif  
   Serial.println(F("reset                  ; revert to factory settings"));
   Serial.println(F("help                   ; show the help"));
 }
@@ -1472,6 +1542,9 @@ void init_commands(void) {
   sCmd.addCommand("channels", cmd_channels); // channels | channels on | channels off
   sCmd.addCommand("bind", cmd_bind); // bind on | bind off
   sCmd.addCommand("rangecheck", cmd_rangecheck); // rangecheck on | rangecheck off
+#ifdef SHOW_RSSI
+  sCmd.addCommand("vrx_rssi", cmd_vrx_rssi); // vrx_rssi | vrx_rssi on | vrx_rssi off
+#endif  
   sCmd.addCommand("reset", cmd_reset);
   sCmd.addCommand("help", cmd_help);
   sCmd.setDefaultHandler(unrecognized);	// Handler for command that isn't matched  (says "Unknown")

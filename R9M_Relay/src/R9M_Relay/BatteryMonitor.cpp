@@ -5,7 +5,10 @@ BatteryMonitor::BatteryMonitor(uint8_t aPin, float aLowCellVoltage, float aMinCe
   adcStarted(false) {
   pinMode(pin, INPUT);
   digitalWrite(pin, LOW);
-  analogReference(INTERNAL); // 1100mV = 1023; built-in reference, equal to 1.1 volts on the ATmega168 or ATmega328P;
+
+  // Note: moved to main setup() because analog reference is used in another module too;
+  // analogReference(INTERNAL); // 1100mV = 1023; built-in reference, equal to 1.1 volts on the ATmega168 or ATmega328P;
+  
   filterArray = new float[filterSize];
 }
 
