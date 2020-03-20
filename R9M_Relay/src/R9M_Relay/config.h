@@ -4,35 +4,48 @@
 
 #define VERSION_NUMBER "07"
 
-// Show UI in OLED and support buttons;
-// If not defined, serial commands are the only way to configure;
-//#define OLED
+//--------------------------------------------------------------------------------------
+// TRAGET is a single point of configure;
+// If TARGET is either STANDALONE_RELAY or COPTER_RELAY predefined settings will be used;
+// Otherwise custom settings are in use;
+//--------------------------------------------------------------------------------------
+// Note: Need to define only one of the TARGETs or none (custom settings will be used);
+//--------------------------------------------------------------------------------------
 
-#define CLI_BAUD  115200
+//#define TARGET_STANDALONE_RELAY
 
-// Enable if needed to show RX RSSI in CLI status command;
-#define SHOW_RSSI
+#define TARGET_COPTER_RELAY
 
 // Turn off all sounds;
 //#define SOUND_OFF
 
-// Beep when each FailSafe packet is sent to PXX; 
-//#define BEEP_FAILSAFE
+//--------------------------------------------------------------------------------------
+#ifdef TARGET_STANDALONE_RELAY
+
+// Show UI in OLED and support buttons;
+// If not defined, serial commands are the only way to configure;
+#define OLED
+
+// Turn off all sounds;
+//#define SOUND_OFF
 
 // Enable to display MIN/MAX values in menu;
 #define RC_MIN_MAX
 
-// Emit CPPM in non-RELAY mode;
-//#define EMIT_CPPM
+//--------------------------------------------------------------------------------------
+#elif defined(TARGET_COPTER_RELAY)
 
-// Enable to support RELAY mode;
+// Enable if needed to show VRX RSSI in CLI status command;
+#define SHOW_RSSI
+
+// Enable to display MIN/MAX values in menu;
+#define RC_MIN_MAX
+
+// Enable to support RELAY mode and enable EMIT_CPPM;
 #define RELAY
 
-#ifdef OLED
-#define RELAY_ENABLED    true // Relay mode is enabled by default if no CLI is available;
-#else
-#define RELAY_ENABLED    false // Relay mode is enabled by default if CLI is available;
-#endif
+#define RELAY_ENABLED    true // Relay mode is enabled initially;
+
 #define RELAY_CHANNEL    CH7  // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
 
 #define GPS_MODE_CHANNEL CH8  // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
@@ -43,6 +56,54 @@
 #define ACTIVE_PXX_MAX   1350  // Max. value for make PXX control active;
 #define ACTIVE_CPPM_MIN  1650  // Min. value for make CPPM control active;
 #define ACTIVE_CPPM_MAX  2050  // Max. value for make CPPM control active;
+
+//--------------------------------------------------------------------------------------
+#else // Custom settings;
+
+// Show UI in OLED and support buttons;
+// If not defined, serial commands are the only way to configure;
+//#define OLED
+
+// Enable if needed to show RX RSSI in CLI status command;
+#define SHOW_RSSI
+
+// Turn off all sounds;
+//#define SOUND_OFF
+
+// Emit CPPM in non-RELAY mode;
+//#define EMIT_CPPM
+
+// Beep when each FailSafe packet is sent to PXX; 
+//#define BEEP_FAILSAFE
+
+// Enable to support RELAY mode;
+//#define RELAY
+
+// Enable to display MIN/MAX values in menu;
+#define RC_MIN_MAX
+
+#define RELAY_CHANNEL    CH7  // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
+
+#define GPS_MODE_CHANNEL CH8  // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
+#define GPS_HOLD_VALUE   1600 // Set it to enable GPS HOLD in GPS_MODE_CHANNEL on both relay and mission drone;
+
+// RELAY_CHANNEL signal boundaries to enable PXX or CPPM control;
+#define ACTIVE_PXX_MIN   950   // Min. value for make PXX control active;
+#define ACTIVE_PXX_MAX   1350  // Max. value for make PXX control active;
+#define ACTIVE_CPPM_MIN  1650  // Min. value for make CPPM control active;
+#define ACTIVE_CPPM_MAX  2050  // Max. value for make CPPM control active;
+
+#ifdef OLED
+#define RELAY_ENABLED    true // Relay mode is enabled by default if no CLI is available;
+#else
+#define RELAY_ENABLED    false // Relay mode is enabled by default if CLI is available;
+#endif
+
+#endif
+
+//--------------------------------------------------------------------------------------
+
+#define CLI_BAUD  115200
 
 // Pins definition;
 // -----------------------------------------------------------------------

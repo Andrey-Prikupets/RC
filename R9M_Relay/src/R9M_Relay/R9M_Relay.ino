@@ -240,7 +240,11 @@ void enableR9M(boolean enable) {
     UNDEFINED=0, R9M_ENABLED=1, R9M_DISABLED=2  
   };
   static uint8_t state = UNDEFINED;
-  uint8_t newState = enable && !isCliActive() ? R9M_ENABLED : R9M_DISABLED;
+  uint8_t newState = enable 
+#ifndef OLED
+    && !isCliActive() 
+#endif    
+    ? R9M_ENABLED : R9M_DISABLED;
   if (state != newState) {
 #ifndef DEBUG
     digitalWrite(R9M_POWER_PIN, newState == R9M_ENABLED ? R9M_POWER_ON : R9M_POWER_OFF);

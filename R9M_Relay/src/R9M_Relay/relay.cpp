@@ -1,3 +1,4 @@
+
 #include "relay.h"
 
 #ifdef RELAY
@@ -13,8 +14,10 @@ uint16_t activePXX_Max = ACTIVE_PXX_MAX;   // Max. value for make PXX control ac
 uint16_t activeCPPM_Min = ACTIVE_CPPM_MIN; // Min. value for make CPPM control active;
 uint16_t activeCPPM_Max = ACTIVE_CPPM_MAX; // Max. value for make CPPM control active;
 
-int16_t channels_out_pxx [NUM_CHANNELS_PXX]  = { 1500,1500,1000,1500,1200,1400,1600,1800, 1000,1000,1000,1000,1000,1000,1000,1000};
-int16_t channels_out_cppm[NUM_CHANNELS_CPPM] = { 1500,1500,1000,1500,1200,1400,1600,1800 };
+// CH5 = 1000 for ARM_CPPM = 0;
+// CH6 = 1000 for ARM_PXX = 0;
+int16_t channels_out_pxx [NUM_CHANNELS_PXX]  = { 1500,1500,1000,1500,1000,1000,1000,1000, 1000,1000,1000,1000,1000,1000,1000,1000};
+int16_t channels_out_cppm[NUM_CHANNELS_CPPM] = { 1500,1500,1000,1500,1000,1000,1000,1000 };
 
 static int8_t active = RELAY_ACTIVE_NONE;
 static int8_t oldActive = RELAY_ACTIVE_NONE;
@@ -58,6 +61,17 @@ void dumpChannels(int16_t channels[], int8_t size) {
 }
 #endif
 
+void centerControlsAndHold(int16_t channels[]) {
+  // Enter GPS Hold;
+  channels[gpsModeChannel] = gpsHoldValue;
+
+  // Reset Roll, Pitch, Yaw;
+  // Throttle is in last position;
+  channels[CH1] = 1500;
+  channels[CH2] = 1500;
+  channels[CH4] = 1500;
+}
+
 void updateChannelsRelay(int16_t channels[]) {
   uint16_t value = channels[relayChannel];
   if (relayEnabled && (value >= activePXX_Min && value <= activePXX_Max)) {
@@ -78,12 +92,20 @@ void updateChannelsRelay(int16_t channels[]) {
 
   if (relayEnabled) {
     if (active != RELAY_ACTIVE_PXX) {
-      channels_out_pxx[gpsModeChannel] = gpsHoldValue;
+      centerControlsAndHold(channels_out_pxx);
     }
     if (active != RELAY_ACTIVE_CPPM) {
-      channels_out_cppm[gpsModeChannel] = gpsHoldValue;
+      centerControlsAndHold(channels_out_cppm);
     }
-    digitalWrite(PIN_CAMERA_SEL, active == RELAY_ACTIVE_CPPM ? CAMERA_CPPM : CAMERA_PXX); // If both CPPM and PXX copters are inacive, select PXX camera;
+
+    if (active == RELAY_ACTIVE_PXX) {
+      digitalWrite(PIN_CAMERA_SEL, CAMERA_PXX);
+    }
+    if (active == RELAY_ACTIVE_CPPM) {
+      digitalWrite(PIN_CAMERA_SEL, CAMERA_CPPM);
+    } else {
+      // If both CPPM and PXX copters are inactive, keep last selected camera;
+    }
   }
 
   channelsInitialized = true;
