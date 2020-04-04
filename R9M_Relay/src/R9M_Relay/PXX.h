@@ -39,9 +39,11 @@ class PXX_Class
 {
     public:
         void begin();
+        void end();
         void send();
         void prepare(int16_t channels[NUM_CHANNELS_PXX]); 
-
+        
+        bool isStarted() { return initialized; }
         bool getModeBind() { return modeBind; }
         void setModeBind(bool value) { modeBind = value; refreshFlag1(); }
         bool getModeRangeCheck() { return modeRangeCheck; }
@@ -85,6 +87,7 @@ class PXX_Class
         bool     sPort;
         bool     send16ch;
         bool     euPlus; // Flex EU;
+        bool     initialized;
         
         void crc(uint8_t data);
         void putPcmSerialBit(uint8_t bit);

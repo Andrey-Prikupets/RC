@@ -8,20 +8,11 @@
 #include "MultiTimer.h"
 #include "BatteryMonitor.h"
 #include "relay.h"
+#include "VRx_Rssi.h"
 
-const int LED_PIN = 13;
-const int LED_DIVIDER = 10;
+const int LED_DIVIDER = 10; // Arduino board LED flashing period divider;
 
-const int BEEPER_PIN = 7;
-const int VOLTAGE_PIN = A3;
-const int R9M_POWER_PIN = 3;
-
-#define R9M_POWER_OFF HIGH
-#define R9M_POWER_ON  LOW
-
-const float LOW_VOLTAGE = 3.47f;
-const float MIN_VOLTAGE = 3.33f;
-const float correction  = 0.947f;
+// Voltage divider;
 const float DIVIDER = (680.0f+10000.0f)/680.0f * correction; // Resistor divider: V+ ----| 10k |--- ADC ----| 680 | --- GND 
 
 NEW_SEQ (SEQ_KEY_NEXT,          BEEP_MS(30));
@@ -76,7 +67,8 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 //10  2000ms  Channels Min/Max page flip;
 //11  250ms   LED normal flashing;
 //12  50ms    LED flashing no-signal; 
-TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000, 250, 50};
+//13  1000ms  CLI periodic functions output; 
+TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000, 250, 50, 1000};
 MultiTimer timer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
 const uint8_t TIMER_MENU_FLASHING         = 0;
@@ -92,6 +84,7 @@ const uint8_t TIMER_INVALID_FLASHING      = 9;
 const uint8_t TIMER_CHANNELS_MIN_MAX_FLIP = 10;
 const uint8_t TIMER_LED_VALID_FLASHING    = 11;
 const uint8_t TIMER_LED_INVALID_FLASHING  = 12;
+const uint8_t TIMER_CLI_PERIODIC          = 13;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
@@ -102,14 +95,27 @@ BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
 void setup() {
 #ifdef DEBUG
-  Serial.begin(115200);
+  Serial.begin(DEBUG_BAUD);
+  Serial.println(F("DEBUG"));
 #endif
+
+  // All analog inputs (Battery voltage and VRx RSSI) use internal analog reference 1.1v;
+  analogReference(INTERNAL); // 1100mV = 1023; built-in reference, equal to 1.1 volts on the ATmega168 or ATmega328P;
+
+#ifdef RELAY
+    relayInit();
+#endif
+#ifdef SHOW_RSSI
+    setup_VRx_Rssi();
+#endif    
     menuSetup();
+#ifdef OLED    
     showLogo();
-    delay(2500);
+#endif    
+    delay(500);
     CPPM.begin();
-#ifndef DEBUG
-    PXX.begin();
+#ifdef OLED
+    PXX.begin(); // When CLI is defined, handleCli handles PXX.begin;
 #endif
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, HIGH);
@@ -127,13 +133,15 @@ void setup() {
       case 3: beeper1.play(&SEQ_BATTERY_3S); break;
       case 4: beeper1.play(&SEQ_BATTERY_4S); break;
     }
+#ifdef OLED    
     showScreenSaver();
+#endif    
 }
 
 void flashLED(bool valid) {
   static byte led = HIGH;
 
-  if (mTimer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
+  if (timer1.isTriggered(valid ? TIMER_LED_VALID_FLASHING : TIMER_LED_INVALID_FLASHING)) {
     led = !led;
     digitalWrite(LED_PIN, led);
   }
@@ -228,15 +236,56 @@ void doPrepare(bool reset_frames) {
 }
 
 void enableR9M(boolean enable) {
+  enum R9M_state {
+    UNDEFINED=0, R9M_ENABLED=1, R9M_DISABLED=2  
+  };
+  static uint8_t state = UNDEFINED;
+  uint8_t newState = enable 
+#ifndef OLED
+    && !isCliActive() 
+#endif    
+    ? R9M_ENABLED : R9M_DISABLED;
+  if (state != newState) {
 #ifndef DEBUG
-    digitalWrite(R9M_POWER_PIN, enable ? R9M_POWER_ON : R9M_POWER_OFF);
-#endif  
+    digitalWrite(R9M_POWER_PIN, newState == R9M_ENABLED ? R9M_POWER_ON : R9M_POWER_OFF);
+#else
+    state = newState;
+    Serial.print(F("R9M "));
+    Serial.println(enable ? F("enabled") : F("disabled"));
+#endif
+  }
 }
 
+#ifndef OLED
+void handleCLI() {
+  static bool initialized = false;
+  bool enabled = !digitalRead(PIN_JUMPER_SETUP); // LOW = enabled;
+  if (enabled != !PXX.isStarted() || !initialized) {
+    initialized = true;
+    if (enabled) {
+      PXX.end();
+#ifndef DEBUG
+      Serial.begin(CLI_BAUD);
+#endif
+      enableR9M(false);
+      Serial.println(F("CLI is ready. Type 'help' for help..."));
+      setCliActive(true);
+    } else {
+      Serial.println(F("Bye"));
+      setCliActive(false);
+      PXX.begin();
+    }
+  }
+}
+#endif
 
 #define MAX_ALLOWED_MISSED_FRAMES 10
 
 void loop() {
+#ifndef OLED
+    handleCLI();
+#endif
+  
     static bool prepare = true;
 
     if(prepare) {

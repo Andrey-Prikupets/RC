@@ -1,8 +1,14 @@
+#include <string.h>
 #include "menu.h"
 #include "PXX.h"
 #include "CPPM.h"
+#include "VRx_Rssi.h"
 
 #include <EEPROM.h>
+
+#define FPSTR(pstr_pointer) (reinterpret_cast<const __FlashStringHelper *>(pstr_pointer))
+
+#ifdef OLED
 //#include "U8glib.h"
 #include <U8g2lib.h>
 //#include <U8x8lib.h>
@@ -19,8 +25,22 @@ uint8_t menu_current = 0;
 
 boolean menuItemFlashing = false;
 
+#endif // #ifdef OLED
+
+#ifndef OLED
+
+// SeralCommand -> https://github.com/kroimon/Arduino-SerialCommand.git
+#include <SerialCommand.h>
+
+SerialCommand sCmd; // Create Serial Command Object.
+static bool cliActive = false;
+
+#endif // #ifndef OLED
+
 // Settings version;
-const uint8_t CURRENT_VERSION = 0x10;
+const uint8_t CURRENT_VERSION = 0x12;
+
+#ifdef OLED
 
 #define MODE_UNDEFINED 0
 #define MODE_LOGO 1
@@ -44,6 +64,8 @@ static byte menuMode = MODE_LOGO;
 #define KEY_NONE 0
 #define KEY_NEXT 1
 #define KEY_SELECT 2
+
+#endif // #ifdef OLED
 
 #define CPPM_START 0
 #define CPPM_LOST 1
@@ -71,6 +93,8 @@ size_t getLength_F(const __FlashStringHelper *ifsh)
   }
   return n;
 }
+
+#ifdef OLED
 
 // Moves cursor X position - good for sequential calls;
 void drawStr_F(uint8_t x, uint8_t y, const __FlashStringHelper* s_P) {
@@ -137,6 +161,8 @@ void drawMenuItem(uint8_t i, const __FlashStringHelper* s_P, const char * s1) {
     }
 }
 
+#endif // #ifdef OLED
+
 const __FlashStringHelper* getPowerStr(void) {
   if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
     switch (PXX.getPower()) {
@@ -179,6 +205,8 @@ const __FlashStringHelper* getBandStrShort(void) {
     default:           return F("FLEX 868"); // RADIO_EU_FLEX
   }
 }
+
+#ifdef OLED
 
 void prepareForDrawing(bool big_font) {
   u8g.setDrawColor(1);      
@@ -358,11 +386,11 @@ void drawScreenSaver() {
 
   const __FlashStringHelper* s;
   switch (cppm_state) {
-  case CPPM_START: s = F("CPPM: Wait");
+  case CPPM_START: s = F("RX: Wait");
        break;
-  case CPPM_OBTAINED: s = F("CPPM: OK");
+  case CPPM_OBTAINED: s = F("RX: OK");
        break;
-  default: s = F("CPPM: Lost"); // CPPM_LOST
+  default: s = F("RX: Lost"); // CPPM_LOST
        break;
   }
   drawStr_F(MENU_LEFT, y, s); 
@@ -454,7 +482,7 @@ void drawRelay() {
   u8g.print("-");
   u8g.print(itoa(ACTIVE_CPPM_MAX, buf, 10));
 }
-#endif
+#endif // #ifdef RELAY
 
 void write_settings(void);
 void adjust_settings(void);
@@ -548,6 +576,16 @@ void adjust_timer(void) {
   }  
 }
 
+bool update_menu_flash_timer(void) {
+  if (timer1.isTriggered(TIMER_MENU_FLASHING)) {
+    menuItemFlashing = !menuItemFlashing;  
+    return true;
+  }
+  return false;
+}
+
+#endif // #ifdef OLED
+
 void adjust_settings(void) {
   switch (radioMode) {
     case RADIO_US_FCC: PXX.setCountry(PXX_COUNTRY_US); PXX.setEUPlus(false); break;   
@@ -556,14 +594,6 @@ void adjust_settings(void) {
   }
   bool send8Ch = (radioMode == RADIO_EU_LBT) && (PXX.getPower() == 0); // 25mW 8Ch;
   PXX.setSend16Ch (!send8Ch);
-}
-
-bool update_menu_flash_timer(void) {
-  if (timer1.isTriggered(TIMER_MENU_FLASHING)) {
-    menuItemFlashing = !menuItemFlashing;  
-    return true;
-  }
-  return false;
 }
 
 void read_settings(void) {
@@ -582,6 +612,22 @@ void read_settings(void) {
 
   PXX.setTelemetry(EEPROM.read(4) != 0);
   PXX.setSPort(EEPROM.read(5) != 0);
+
+#ifdef RELAY
+  relayEnabled = EEPROM.read(6) != 0;
+  EEPROM.get(7, relayChannel);
+  EEPROM.get(8, gpsModeChannel);
+  EEPROM.get(9, gpsHoldValue);
+  EEPROM.get(11, activePXX_Min);
+  EEPROM.get(13, activePXX_Max);
+  EEPROM.get(15, activeCPPM_Min);
+  EEPROM.get(17, activeCPPM_Max);
+#endif
+
+#ifdef SHOW_RSSI
+  EEPROM.get(19, vrx_rssi_min);
+  EEPROM.get(21, vrx_rssi_max);  
+#endif
 }
 
 void init_settings(void) {
@@ -596,27 +642,75 @@ void init_settings(void) {
   PXX.setTelemetry(true);
   PXX.setSPort(true);
   PXX.setProto(PXX_PROTO_X16);
+
+#ifdef RELAY
+  relayEnabled = RELAY_ENABLED;
+  relayChannel = RELAY_CHANNEL;      // Channel to switch between PXX and PPM control; Allowed only channels CH5..CH8;
+  gpsModeChannel = GPS_MODE_CHANNEL; // Set it to channel to enable GPS HOLD mode; Allowed only channels CH5..CH8;
+  gpsHoldValue = GPS_HOLD_VALUE;    // Set it to enable GPS HOLD in GPS_MODE_CHANNEL on both relay and mission drone;
+
+// RELAY_CHANNEL signal boundaries to enable PXX or CPPM control;
+  activePXX_Min = ACTIVE_PXX_MIN;   // Min. value for make PXX control active;
+  activePXX_Max = ACTIVE_PXX_MAX;   // Max. value for make PXX control active;
+  activeCPPM_Min = ACTIVE_CPPM_MIN; // Min. value for make CPPM control active;
+  activeCPPM_Max = ACTIVE_CPPM_MAX; // Max. value for make CPPM control active;
+#endif  
+
+#ifdef SHOW_RSSI
+  vrx_rssi_min = VRX_RSSI_MIN;
+  vrx_rssi_max = VRX_RSSI_MAX;
+#endif
 }
 
 void write_settings(void) {
-  EEPROM.write(0, CURRENT_VERSION);
-  EEPROM.write(1, radioMode);
-  EEPROM.write(2, PXX.getPower());
-  EEPROM.write(3, PXX.getRxNum());
-  EEPROM.write(4, PXX.getTelemetry() ? 1 : 0);
-  EEPROM.write(5, PXX.getSPort() ? 1 : 0);
+  EEPROM.update(0, CURRENT_VERSION);
+  EEPROM.update(1, radioMode);
+  EEPROM.update(2, PXX.getPower());
+  EEPROM.update(3, PXX.getRxNum());
+  EEPROM.update(4, PXX.getTelemetry() ? 1 : 0);
+  EEPROM.update(5, PXX.getSPort() ? 1 : 0);
+
+#ifdef RELAY
+  EEPROM.update(6, relayEnabled ? 1 : 0);
+  EEPROM.put(7, relayChannel);
+  EEPROM.put(8, gpsModeChannel);
+  EEPROM.put(9, gpsHoldValue);
+  EEPROM.put(11, activePXX_Min);
+  EEPROM.put(13, activePXX_Max);
+  EEPROM.put(15, activeCPPM_Min);
+  EEPROM.put(17, activeCPPM_Max);
+#endif  
+
+#ifdef SHOW_RSSI
+  EEPROM.put(19, vrx_rssi_min);
+  EEPROM.put(21, vrx_rssi_max);  
+#endif
 }
+
+#ifndef OLED
+
+void init_commands(void);
+
+#endif // #ifndef OLED
 
 void menuSetup(void)
 {
+#ifdef OLED
   u8g.begin();
   pinMode(PIN_KEY_NEXT, INPUT_PULLUP);           // set pin to input with pullup
   pinMode(PIN_KEY_SELECT, INPUT_PULLUP);           // set pin to input with pullup
+#else
+  pinMode(PIN_JUMPER_SETUP, INPUT_PULLUP);           // set pin to input with pullup
+  init_commands();
+#endif 
   init_settings();
   read_settings();
+#ifdef OLED
   adjust_timer();
+#endif
 }
 
+#ifdef OLED
 void showLogo(void) {
     menuMode = MODE_LOGO;
     u8g.firstPage();
@@ -681,6 +775,8 @@ void showRelay() {
 }
 #endif
 
+#endif // #ifdef OLED
+
 void handleBeeps(void) {
   if (timer1.isTriggered(TIMER_MODE_SOUND)) {
     if (PXX.getModeRangeCheck()) {
@@ -692,8 +788,13 @@ void handleBeeps(void) {
   }
 }
 
+#ifndef OLED
+void handlePeriodic();
+#endif
+
 void menuLoop(void)
 {
+#ifdef OLED
   byte refreshMenuMode = MODE_UNDEFINED;
 
   static uint8_t last_key_code = KEY_NONE;
@@ -801,7 +902,27 @@ void menuLoop(void)
       break;
 #endif      
   }
+#endif // #ifdef OLED
+
+#ifndef OLED
+  if (cliActive) {
+    sCmd.readSerial();
+    if (timer1.isTriggered(TIMER_CLI_PERIODIC)) {
+      handlePeriodic();
+    }
+  }
+#endif // #ifndef OLED
 }
+
+#ifndef OLED
+void setCliActive(bool value) {
+  cliActive = value;
+}
+
+bool isCliActive() {
+  return cliActive;
+}
+#endif
 
 void setCPPM_Start(void) {
 #ifdef DEBUG
@@ -856,3 +977,578 @@ bool cppmModeChanged(void) {
     }
     return false;
 }
+
+#ifndef OLED
+
+bool readBooleanValue(bool& valueVar, bool doSave = true) {
+  char *name = sCmd.next();
+  if (strcasecmp(name,"on") == 0) {
+    valueVar = true;
+  } else
+  if (strcasecmp(name,"off") == 0) {
+    valueVar = false;
+  } else {
+    Serial.println(F("#- Boolean value should be 'on' or 'off': "));
+    return false;
+  }
+  if (doSave)
+    write_settings();
+  return true;
+}
+
+void printBooleanValue(bool value) {
+  Serial.print(value ? F("on") : F("off"));  
+}
+
+bool cmd_set_mode() {
+  char *name = sCmd.next();
+  if (strcasecmp(name,"US") == 0)
+    radioMode = RADIO_US_FCC;
+  else if (strcasecmp(name,"EU") == 0) 
+    radioMode = RADIO_EU_LBT; 
+  else if (strcasecmp(name,"FLEX") == 0) 
+    radioMode = RADIO_EU_FLEX; 
+  else {
+    Serial.print(F("#- Invalid mode (US|EU|FLEX): "));
+    Serial.print(name);
+    Serial.println();
+    return false;
+  }
+  adjust_settings();
+  write_settings();
+  return true;
+}
+
+void cmd_get_mode() {
+  switch(radioMode) {
+    case RADIO_US_FCC: Serial.print(F("US")); break;
+    case RADIO_EU_LBT: Serial.print(F("EU")); break;
+    case RADIO_EU_FLEX: Serial.print(F("FLEX")); break;
+  }
+}
+
+void cmd_get_power() {
+  if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
+    switch (PXX.getPower()) {
+  case 0: Serial.print(F("10")); break;
+  case 1: Serial.print(F("100")); break;
+  case 2: Serial.print(F("500")); break;
+  case 3: Serial.print(F("1000")); break;
+    }
+  } else {
+    switch (PXX.getPower()) {
+  case 0: Serial.print(F("25_8ch")); break;
+  case 1: Serial.print(F("25")); break;
+  case 2: Serial.print(F("200")); break;
+  case 3: Serial.print(F("500")); break;
+    }    
+  }
+}
+
+bool cmd_set_power() {
+  char *name = sCmd.next();
+  if (radioMode != RADIO_EU_LBT) { // RADIO_US_FCC || RADIO_EU_FLEX
+    if (strcasecmp(name,"10") == 0)
+      PXX.setPower(0);
+    else if (strcasecmp(name,"100") == 0)
+      PXX.setPower(1);
+    else if (strcasecmp(name,"500") == 0)
+      PXX.setPower(2);
+    else if (strcasecmp(name,"1000") == 0)
+      PXX.setPower(3);
+    else {
+      Serial.print(F("#- Invalid US/FLEX mode power (10|100|500|1000): "));
+      Serial.print(name);
+      Serial.println();
+      return false;
+    }
+  } else {
+    if (strcasecmp(name,"25_8ch") == 0)
+      PXX.setPower(0);
+    else if (strcasecmp(name,"25") == 0)
+      PXX.setPower(1);
+    else if (strcasecmp(name,"200") == 0)
+      PXX.setPower(2);
+    else if (strcasecmp(name,"500") == 0)
+      PXX.setPower(3);
+    else {
+      Serial.print(F("#- Invalid EU mode power (25_8ch|25|200|500): "));
+      Serial.print(name);
+      Serial.println();
+      return false;
+    }
+  }
+  adjust_settings();
+  write_settings();
+  return true;
+}
+
+bool cmd_set_rx() {
+  char *val = sCmd.next();
+  if (!val) {
+    Serial.println(F("#- Receiver number missing"));
+    return false;
+  }
+  int value = atoi(val);
+  if (value < 0 || value > 255) {
+    Serial.println(F("#- Receiver number should be from 0 to 255"));
+    return false;    
+  }
+  PXX.setRxNum(value);
+  write_settings();
+  return true;
+}
+
+void cmd_get_rx() {
+  Serial.print(PXX.getRxNum());
+}
+
+bool cmd_set_telem() {
+  bool value;
+  if (!readBooleanValue(value, false))
+    return false;
+  PXX.setTelemetry(value);
+  write_settings();
+  return true;
+}
+
+void cmd_get_telem() {
+  printBooleanValue(PXX.getTelemetry());
+}
+
+bool cmd_set_sport() {
+  bool value;
+  if (!readBooleanValue(value, false))
+    return false;
+  PXX.setSPort(value);
+  write_settings();
+  return true;
+}
+
+void cmd_get_sport() {
+  printBooleanValue(PXX.getSPort());
+}
+
+#ifdef RELAY
+
+bool readChannelNumber(uint8_t& channelVar) {
+  char *name = sCmd.next();
+  if (!name) {
+    Serial.println(F("#- Channel name missing"));
+    return false;
+  }
+  if (strncasecmp(name, "CH", 2)) { // != 0
+    Serial.println(F("#- Channel name should start with 'CH'"));
+    return false; 
+  }
+  int channel = atoi(name+2);
+  if (channel < 5 || channel > 8) {
+    Serial.println(F("#- Channel name should be CH5 to CH8"));
+    return false;
+  }
+  channelVar = channel-1;
+  write_settings();
+  return true;
+}
+
+void printChannelNumber(uint8_t channel) {
+  Serial.print(F("CH"));  
+  Serial.print(channel+1, DEC);  
+}
+
+bool readChannelValue(uint16_t& valueVar) {
+  char *name = sCmd.next();
+  if (!name) {
+    Serial.println(F("#- Channel value missing"));
+    return false;
+  }
+  int value = atoi(name);
+  if (value < 900 || value > 2100) {
+    Serial.println(F("#- Channel value should be in range [900..2100]"));
+    return false;
+  }
+  valueVar = value;
+  write_settings();
+  return true;
+}
+
+bool cmd_set_relayEnabled()   { return readBooleanValue(relayEnabled); }
+void cmd_get_relayEnabled()   { printBooleanValue(relayEnabled); }
+bool cmd_set_relayChannel()   { return readChannelNumber(relayChannel); }
+void cmd_get_relayChannel()   { printChannelNumber(relayChannel); }
+bool cmd_set_gpsModeChannel() { return readChannelNumber(gpsModeChannel); }
+void cmd_get_gpsModeChannel() { printChannelNumber(gpsModeChannel); }
+bool cmd_set_gpsHoldValue()   { return readChannelValue(gpsHoldValue); }
+void cmd_get_gpsHoldValue()   { Serial.print(gpsHoldValue, DEC); }
+bool cmd_set_activePXX_Min()  { return readChannelValue(activePXX_Min); }
+void cmd_get_activePXX_Min()  { Serial.print(activePXX_Min, DEC); }
+bool cmd_set_activePXX_Max()  { return readChannelValue(activePXX_Max); }
+void cmd_get_activePXX_Max()  { Serial.print(activePXX_Max, DEC); }
+bool cmd_set_activeCPPM_Min() { return readChannelValue(activeCPPM_Min); }
+void cmd_get_activeCPPM_Min() { Serial.print(activeCPPM_Min, DEC); }
+bool cmd_set_activeCPPM_Max() { return readChannelValue(activeCPPM_Max); }
+void cmd_get_activeCPPM_Max() { Serial.print(activeCPPM_Max, DEC); }
+
+#endif
+
+#ifdef SHOW_RSSI
+
+bool readADCValue(int& valueVar) {
+  char *name = sCmd.next();
+  if (!name) {
+    Serial.println(F("#- ADC value missing"));
+    return false;
+  }
+  int value = atoi(name);
+  if (value < 0 || value > 1023) {
+    Serial.println(F("#- ADC value should be in range [0..1023]"));
+    return false;
+  }
+  valueVar = value;
+  write_settings();
+  return true;
+}
+
+bool cmd_set_vrx_rssi_min()  { return readADCValue(vrx_rssi_min); }
+void cmd_get_vrx_rssi_min()  { Serial.print(vrx_rssi_min, DEC); }
+bool cmd_set_vrx_rssi_max()  { return readADCValue(vrx_rssi_max); }
+void cmd_get_vrx_rssi_max()  { Serial.print(vrx_rssi_max, DEC); }
+
+#endif
+
+struct Variable {
+  const char *name;
+  bool(*setter)();
+  void(*getter)();
+  const __FlashStringHelper * help;
+};
+
+static const char PROGMEM HELP_mode[] = "R9 frequency mode [US|EU|FLEX]";
+static const char PROGMEM HELP_power[] = "R9 power US/FLEX: [10|100|500|1000], EU: [25_8ch|25|200|500]";
+static const char PROGMEM HELP_rx[] = "R9 receiver number (0=any) [0..255]";
+static const char PROGMEM HELP_telem[] = "R9 telemetry enabled or disabled [on|off]";
+static const char PROGMEM HELP_sport[] = "R9 S.Port enabled or disabled [on|off]";
+static const char PROGMEM HELP_relayEnabled[] = "Two-copters relay mode enabled or disabled [on|off]";
+static const char PROGMEM HELP_relayChannel[] = "Channel to switch between PXX and PPM control [CH5..CH8]";
+static const char PROGMEM HELP_gpsModeChannel[] = "Channel to enable GPS HOLD mode [CH5..CH8]";
+static const char PROGMEM HELP_gpsHoldValue[] = "Channel value to enable GPS HOLD in GPS_MODE_CHANNEL same on relay(CPPM) and mission(PXX) drone [900..2100]";
+static const char PROGMEM HELP_activePXX_Min[] = "Min. value in relay_channel to make mission(PXX) drone active [900..2100]";
+static const char PROGMEM HELP_activePXX_Max[] = "Max. value in relay_channel to make mission(PXX) drone active [900..2100]";
+static const char PROGMEM HELP_activeCPPM_Min[] = "Min. value in relay_channel to make relay(CPPM) drone active [900..2100]";
+static const char PROGMEM HELP_activeCPPM_Max[] = "Max. value in relay_channel to make relay(CPPM) drone active [900..2100]";
+#ifdef SHOW_RSSI
+static const char PROGMEM HELP_vrx_rssi_min[] = "Min. ADC value for for Video RX Rssi (0%) [0..1023]";
+static const char PROGMEM HELP_vrx_rssi_max[] = "Max. ADC value for for Video RX Rssi (100%) [0..1023]";
+#endif
+
+static Variable CONFIG_VARS[] = {
+   {"R9_mode",          cmd_set_mode,           cmd_get_mode,           FPSTR(HELP_mode)}
+  ,{"R9_power",         cmd_set_power,          cmd_get_power,          FPSTR(HELP_power)}
+  ,{"R9_rx",            cmd_set_rx,             cmd_get_rx,             FPSTR(HELP_rx)}
+  ,{"R9_telem",         cmd_set_telem,          cmd_get_telem,          FPSTR(HELP_telem)}
+  ,{"R9_sport",         cmd_set_sport,          cmd_get_sport,          FPSTR(HELP_sport)}
+#ifdef SHOW_RSSI
+  ,{"vrx_rssi_min",     cmd_set_vrx_rssi_min,   cmd_get_vrx_rssi_min,   FPSTR(HELP_vrx_rssi_min)}
+  ,{"vrx_rssi_max",     cmd_set_vrx_rssi_max,   cmd_get_vrx_rssi_max,   FPSTR(HELP_vrx_rssi_max)}
+#endif
+#ifdef RELAY
+  ,{"relay_enabled",    cmd_set_relayEnabled,   cmd_get_relayEnabled,   FPSTR(HELP_relayEnabled)}
+  ,{"relay_channel",    cmd_set_relayChannel,   cmd_get_relayChannel,   FPSTR(HELP_relayChannel)}
+  ,{"gps_mode_channel", cmd_set_gpsModeChannel, cmd_get_gpsModeChannel, FPSTR(HELP_gpsModeChannel)}
+  ,{"gps_hold_value",   cmd_set_gpsHoldValue,   cmd_get_gpsHoldValue,   FPSTR(HELP_gpsHoldValue)}
+  ,{"active_PXX_min",   cmd_set_activePXX_Min,  cmd_get_activePXX_Min,  FPSTR(HELP_activePXX_Min)}
+  ,{"active_PXX_max",   cmd_set_activePXX_Max,  cmd_get_activePXX_Max,  FPSTR(HELP_activePXX_Max)}
+  ,{"active_CPPM_min",  cmd_set_activeCPPM_Min, cmd_get_activeCPPM_Min, FPSTR(HELP_activeCPPM_Min)}
+  ,{"active_CPPM_max",  cmd_set_activeCPPM_Max, cmd_get_activeCPPM_Max, FPSTR(HELP_activeCPPM_Max)}
+#endif
+};
+
+#define CONFIG_VARS_NUM (sizeof(CONFIG_VARS) / sizeof(Variable))
+
+void cmd_set_get(bool set) {
+  char *name = sCmd.next();
+  if (!name) {
+    Serial.println(F("#- Variable name expected"));
+    return;
+  }
+  for (int i=0; i<CONFIG_VARS_NUM; i++) {
+    Variable* var = &CONFIG_VARS[i]; 
+    if (strcasecmp(name, var->name) == 0) {
+      if (!set) { // get
+        Serial.print("# ");
+        Serial.print(name);
+        Serial.print(" is ");
+        var->getter();
+        Serial.println();
+      } else {
+        bool success = var->setter();
+        if (success) {
+          Serial.print(F("# "));
+          Serial.print(name);
+          Serial.print(" set to ");
+          var->getter();
+          Serial.println();
+        }
+      }
+      return;
+    }
+  }
+  Serial.print(F("#- Unknown variable: "));
+  Serial.println(name);
+}
+
+void cmd_set() {
+  cmd_set_get(true);
+}
+
+void cmd_get() {
+  cmd_set_get(false);
+}
+
+void cmd_dump() {
+  Serial.println(F("# Dump:"));
+  for (int i=0; i<CONFIG_VARS_NUM; i++) {
+    Variable* v = &CONFIG_VARS[i];
+    Serial.print(F("set "));
+    Serial.print(v->name);
+    Serial.print(" ");
+    v->getter();
+    if (v->help) {
+      Serial.print(F(" ; "));
+      Serial.print(v->help);
+    }
+    Serial.println();
+  }
+}
+
+static void(*periodic_func)(bool) = NULL;
+
+void handlePeriodic() {
+  if (periodic_func)
+    periodic_func(true);
+}
+
+void cmd_periodic(void(*f)(bool), bool isPeriodicOnly) {
+  char *arg = sCmd.next();
+  if (!arg || !strlen(arg)) {
+    if (isPeriodicOnly) {
+      Serial.println(F("#- This command requires on/off parameter."));
+    } else {
+      f(true);
+    }
+  } else
+  if (strcasecmp(arg, "on") == 0) {
+    if (periodic_func) {
+      Serial.println(periodic_func == f ? F("#- This process is already running.") : F("#- Other process is already running."));
+      return;
+    }
+    f(true);
+    periodic_func = f;
+  } else
+  if (strcasecmp(arg, "off") == 0) {
+    if (!periodic_func) {
+      Serial.println(F("#- No process is running."));
+      return;
+    }
+    if (periodic_func != f) {
+      Serial.println(F("#- Other process is running."));
+      return;
+    }
+    f(false);
+    periodic_func = NULL;
+  } else {
+    Serial.print(F("#- Not on/off parameter: "));
+    Serial.println(arg);
+  }
+}
+
+void handle_status(bool active) {
+  if (!active)
+    return;
+  Serial.print(F("# Status (ver. "));
+  Serial.print(VERSION_NUMBER);
+  Serial.println(F(")"));
+
+  Serial.print(F("Build options: "));
+#ifdef OLED
+  Serial.print(F("OLED "));
+#endif  
+#ifdef SOUND_OFF
+  Serial.print(F("SOUND_OFF "));
+#endif  
+#ifdef BEEP_FAILSAFE
+  Serial.print(F("BEEP_FAILSAFE "));
+#endif  
+#ifdef RC_MIN_MAX
+  Serial.print(F("RC_MIN_MAX "));
+#endif  
+#ifdef EMIT_CPPM
+  Serial.print(F("EMIT_CPPM "));
+#endif  
+#ifdef RELAY
+  Serial.print(F("RELAY "));
+#endif  
+#ifdef SHOW_RSSI
+  Serial.print(F("SHOW_RSSI "));
+#endif
+  Serial.println();
+
+  char buf[5];
+  Serial.print(F("Battery "));
+  Serial.print(battery1.getNumCells(), DEC);
+  Serial.print(F("s: "));
+  dtostrf(battery1.getCurrVoltage(), 4, 1, buf);
+  Serial.print(buf);
+  Serial.println("v");
+
+  const __FlashStringHelper* s;
+  switch (cppm_state) {
+  case CPPM_START: s = F("RX: Wait");
+       break;
+  case CPPM_OBTAINED: s = F("RX: OK");
+       break;
+  default: s = F("RX: Lost"); // CPPM_LOST
+       break;
+  }
+  Serial.print(s);
+
+  if (CPPM.getFailReason()) {
+    Serial.print(F(", Fail reason: "));
+      Serial.println(CPPM.getFailReason(), DEC);
+  } else {
+    Serial.println();
+  }
+
+  Serial.print(F("Band: "));
+  Serial.print(getBandStrShort());
+  Serial.print(F(", "));
+  Serial.println(getPowerStr()); 
+
+#ifdef RELAY
+  Serial.print(F("Relay: "));
+  if (relayEnabled) {
+    switch (getRelayActive()) {
+      case RELAY_ACTIVE_PXX: s = F("PXX");  break;
+      case RELAY_ACTIVE_CPPM: s = F("CPPM"); break; 
+      default: s = F("---");
+    }
+    Serial.println(s);
+  } else {
+    Serial.println(" OFF");    
+  }
+#endif
+
+  if (PXX.getModeRangeCheck()) Serial.println(F("RANGE CHECK in progress"));
+  if (PXX.getModeBind()) Serial.println(F("BIND in progress"));
+}
+
+void cmd_status() { cmd_periodic(handle_status, false); }
+
+void handle_channels(bool active) {
+  if (!active)
+    return;
+  Serial.println(F("# Channels:"));
+
+  for (int8_t i=0; i<NUM_CHANNELS_CPPM; i++) {
+    Serial.print(F("CH"));
+    Serial.print(i+1, DEC);
+    if (cppmActive) {
+      int16_t x = channels[i];
+      Serial.print(channelValid(x) ? F(":  ") : F(": *"));
+      Serial.print(x, DEC);
+    } else {
+      Serial.print(F(": ----"));
+    }
+#ifdef RC_MIN_MAX
+    if (channelsMinMaxSet) {
+      Serial.print(F(" ["));
+      Serial.print(channelsMin[i], DEC);
+      Serial.print(F(".."));
+      Serial.print(channelsMax[i], DEC);
+      Serial.print(']');
+    }
+#endif
+    Serial.println();
+  }
+  Serial.print(F("Errors: "));
+  Serial.print(CPPM.getErrorCount(), DEC);
+  Serial.print(F(" Fail reason: "));
+  Serial.println(CPPM.getFailReason(), DEC);
+} 
+
+void cmd_channels() { cmd_periodic(handle_channels, false); }
+
+void handle_bind(bool active) {
+  PXX.setModeBind(active);
+  Serial.println(active ? F("# Binding...") : F("# Bind finished."));
+} 
+
+void cmd_bind() { cmd_periodic(handle_bind, true); }
+
+void handle_rangecheck(bool active) {
+  PXX.setModeRangeCheck(active);
+  Serial.println(active ? F("# Range checking...") : F("# Range check finished."));
+} 
+
+void cmd_rangecheck() { cmd_periodic(handle_rangecheck, true); }
+
+#ifdef SHOW_RSSI
+void handle_vrx_rssi(bool active) {
+  if (!active)
+    return;
+    
+  Serial.print(F("# VRx RSSI: "));
+  Serial.print(getVRx_Rssi(), DEC);
+  Serial.print(F("% ["));
+  Serial.print(getVRx_Rssi_raw(), DEC);
+  Serial.println("]");
+} 
+
+void cmd_vrx_rssi() { cmd_periodic(handle_vrx_rssi, false); }
+#endif
+
+void cmd_reset() {  
+  init_settings();
+  write_settings();
+  Serial.println(F("# Settings were reset"));
+}
+
+void cmd_help() {
+  Serial.println(F("# Help"));
+  Serial.println(F("set <variable> <value> ; set variable value"));
+  Serial.println(F("get <variable>         ; get variable value"));
+  Serial.println(F("dump                   ; print all variable values"));
+  Serial.println(F("status [on|off]        ; show status [periodically]"));
+  Serial.println(F("channels [on|off]      ; show channel values [periodically]"));
+  Serial.println(F("bind on|off            ; turn BIND mode on|off"));
+  Serial.println(F("rangecheck on|off      ; turn RangeCheck on|off"));
+#ifdef SHOW_RSSI
+  Serial.println(F("vrx_rssi on|off        ; show VRx RSSI [periodically]"));
+#endif  
+  Serial.println(F("reset                  ; revert to factory settings"));
+  Serial.println(F("help                   ; show the help"));
+}
+
+void unrecognized(const char *command) {
+  Serial.print(F("#- Unknown Command: "));
+  Serial.println(command);
+}
+
+void init_commands(void) {
+  sCmd.addCommand("set", cmd_set); // set <value> <value>
+  sCmd.addCommand("get", cmd_get); // get <variable>
+  sCmd.addCommand("dump", cmd_dump);
+  sCmd.addCommand("status", cmd_status); // status | status on | status off
+  sCmd.addCommand("channels", cmd_channels); // channels | channels on | channels off
+  sCmd.addCommand("bind", cmd_bind); // bind on | bind off
+  sCmd.addCommand("rangecheck", cmd_rangecheck); // rangecheck on | rangecheck off
+#ifdef SHOW_RSSI
+  sCmd.addCommand("vrx_rssi", cmd_vrx_rssi); // vrx_rssi | vrx_rssi on | vrx_rssi off
+#endif  
+  sCmd.addCommand("reset", cmd_reset);
+  sCmd.addCommand("help", cmd_help);
+  sCmd.setDefaultHandler(unrecognized);	// Handler for command that isn't matched  (says "Unknown")
+  sCmd.clearBuffer();
+}
+
+#endif // #ifndef OLED
