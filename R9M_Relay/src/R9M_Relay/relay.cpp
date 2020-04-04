@@ -14,6 +14,18 @@ uint16_t activePXX_Max = ACTIVE_PXX_MAX;   // Max. value for make PXX control ac
 uint16_t activeCPPM_Min = ACTIVE_CPPM_MIN; // Min. value for make CPPM control active;
 uint16_t activeCPPM_Max = ACTIVE_CPPM_MAX; // Max. value for make CPPM control active;
 
+bool     holdThrottleEnabled = HOLD_THROTTLE_ENABLED; // Enable setting mid throttle (normally, 1500) for armed inactive copter and min throttle for disarmed inactive copter;
+uint16_t midThrottle = MID_THROTTLE;       // Mid throttle value;
+uint16_t minThrottle = MIN_THROTTLE;       // Min throttle value;
+
+// ARM channel signal boundaries for PXX or CPPM control; only armed copter will receive mid throttle when inactive; not armed will receive min throtlle;
+uint8_t  armCPPMChannel = ARM_CPPM_CHANNEL; // Set it to channel to arm CPPM controlled copter; Allowed only channels CH5..CH8;
+uint8_t  armPXXChannel  = ARM_PXX_CHANNEL;  // Set it to channel to arm PXX controlled copter; Allowed only channels CH5..CH8;
+uint16_t armCPPM_Min    = ARM_CPPM_MIN;     // Min. value for make CPPM arm;
+uint16_t armCPPM_Max    = ARM_CPPM_MAX;     // Max. value for make CPPM arm;
+uint16_t armPXX_Min     = ARM_PXX_MIN;      // Min. value for make PXX arm;
+uint16_t armPXX_Max     = ARM_PXX_MAX;      // Max. value for make PXX arm;
+
 // CH5 = 1000 for ARM_CPPM = 0;
 // CH6 = 1000 for ARM_PXX = 0;
 int16_t channels_out_pxx [NUM_CHANNELS_PXX]  = { 1500,1500,1000,1500,1000,1000,1000,1000, 1000,1000,1000,1000,1000,1000,1000,1000};
@@ -22,6 +34,8 @@ int16_t channels_out_cppm[NUM_CHANNELS_CPPM] = { 1500,1500,1000,1500,1000,1000,1
 static int8_t active = RELAY_ACTIVE_NONE;
 static int8_t oldActive = RELAY_ACTIVE_NONE;
 static bool channelsInitialized = false;
+static bool pxx_armed = false;
+static bool cppm_armed = false;
 
 void relayInit() {
   pinMode(PIN_CAMERA_SEL, OUTPUT);
@@ -61,7 +75,11 @@ void dumpChannels(int16_t channels[], int8_t size) {
 }
 #endif
 
-void centerControlsAndHold(int16_t channels[]) {
+bool inRange(uint16_t x, uint16_t min, uint16_t max) {
+  return x >= min && x <= max;
+}
+
+void centerControlsAndHold(int16_t channels[], bool thrOverride, uint16_t thrOverrideValue) {
   // Enter GPS Hold;
   channels[gpsModeChannel] = gpsHoldValue;
 
@@ -69,15 +87,53 @@ void centerControlsAndHold(int16_t channels[]) {
   // Throttle is in last position;
   channels[CH1] = 1500;
   channels[CH2] = 1500;
+  if (thrOverride) {
+    channels[CH3] = thrOverrideValue;
+  }
   channels[CH4] = 1500;
 }
 
+class Debouncer<T> {
+public:
+  Debouncer(int8_t maxCount) : maxCount(maxCount), counter(0), initialized(false);
+  T debounce(T value) {
+    if (!initialized) {
+      initialized = true;
+      stableValue = value;
+      prevValue = value;
+    } else
+    if (prevValue == value) {
+      if (counter < maxCount) {
+        counter++;
+      } else {
+        stableValue = value;
+      }
+    } else { // value == stableValue || value != prevValue;
+      prevValue = value;
+      counter = 0;
+    }
+    return stableValue;
+  }
+private:
+  int8_t maxCount;
+  bool initialized;
+  int8_t counter;
+  T stableValue;
+  T prevValue;
+}
+
+static Debouncer<bool> pxx_debouncer(ARM_DEBOUNCE_FRAMES);
+static Debouncer<bool> cppm_debouncer(ARM_DEBOUNCE_FRAMES);
+
 void updateChannelsRelay(int16_t channels[]) {
+  pxx_armed = channelsInitialized && pxx_debouncer.debounce(inRange(channels[armPXXChannel], armPXX_Min, armPXX_Max));
+  cppm_armed = channelsInitialized && cppm_debouncer.debounce(inRange(channels[armCPPMChannel], armCPPM_Min, armCPPM_Max));
+
   uint16_t value = channels[relayChannel];
-  if (relayEnabled && (value >= activePXX_Min && value <= activePXX_Max)) {
+  if (relayEnabled && inRange(value, activePXX_Min, activePXX_Max)) {
     setRelayActive(RELAY_ACTIVE_PXX);
   } else
-  if (relayEnabled && (value >= activeCPPM_Min && value <= activeCPPM_Max)) {
+  if (relayEnabled && inRange(value, activeCPPM_Min, activeCPPM_Max)) {
     setRelayActive(RELAY_ACTIVE_CPPM);
   } else {
     setRelayActive(RELAY_ACTIVE_NONE);
@@ -92,10 +148,10 @@ void updateChannelsRelay(int16_t channels[]) {
 
   if (relayEnabled) {
     if (active != RELAY_ACTIVE_PXX) {
-      centerControlsAndHold(channels_out_pxx);
+      centerControlsAndHold(channels_out_pxx, holdThrottleEnabled, pxx_armed ? midThrottle : minThrottle);
     }
     if (active != RELAY_ACTIVE_CPPM) {
-      centerControlsAndHold(channels_out_cppm);
+      centerControlsAndHold(channels_out_cppm, holdThrottleEnabled, cppm_armed ? midThrottle : minThrottle);
     }
 
     if (active == RELAY_ACTIVE_PXX) {
@@ -115,6 +171,14 @@ void updateChannelsRelay(int16_t channels[]) {
   Serial.print("PXX ="); dumpChannels(channels_out_pxx, NUM_CHANNELS_PXX);
   Serial.print("CPPM="); dumpChannels(channels_out_cppm, NUM_CHANNELS_CPPM);
 #endif
+}
+
+bool getCPPMArmed() {
+  return cppm_armed;
+}
+
+bool getPXXArmed() {
+  return pxx_armed;
 }
 
 #endif

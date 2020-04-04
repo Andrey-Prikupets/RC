@@ -57,6 +57,18 @@
 #define ACTIVE_CPPM_MIN  1650  // Min. value for make CPPM control active;
 #define ACTIVE_CPPM_MAX  2050  // Max. value for make CPPM control active;
 
+#define HOLD_THROTTLE_ENABLED true // Enable setting mid throttle (normally, 1500) for armed inactive copter and min throttle for disarmed inactive copter;
+#define MID_THROTTLE	1500       // Mid throttle value;
+#define MIN_THROTTLE	1000       // Min throttle value;
+
+// ARM channel signal boundaries for PXX or CPPM control; only armed copter will receive mid throttle when inactive; not armed will receive min throtlle;
+#define ARM_CPPM_CHANNEL CH5       // Set it to channel to arm CPPM controlled copter; Allowed only channels CH5..CH8;
+#define ARM_PXX_CHANNEL  CH6       // Set it to channel to arm PXX controlled copter; Allowed only channels CH5..CH8;
+#define ARM_CPPM_MIN     1000      // Min. value for make CPPM arm;
+#define ARM_CPPM_MAX     1000      // MAX. value for make CPPM arm;
+#define ARM_PXX_MIN      1000      // Min. value for make PXX arm;
+#define ARM_PXX_MAX      1000      // MAX. value for make PXX arm;
+
 //--------------------------------------------------------------------------------------
 #else // Custom settings;
 
@@ -161,5 +173,7 @@ const float correction  = 0.947f; // Generic is 1.000;
   #define VRX_RSSI_MIN  136 // 100 is generic value;
   #define VRX_RSSI_MAX  417 // 300 is a generic value;
 #endif
+
+#define ARM_DEBOUNCE_FRAMES 10 // Number of subsequent frames with stable channel value interval hit for switching armed status;
 
 #endif

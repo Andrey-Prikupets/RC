@@ -453,34 +453,34 @@ void drawRelay() {
 
   buf[0] = 'C';
   buf[1] = 'H';
-  itoa(RELAY_CHANNEL+1, buf+2, 10);
+  itoa(relayChannel+1, buf+2, 10);
   drawStr_F(MENU_LEFT, y, F("Relay"));   
   u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
   y += char_height;
 
-  itoa(GPS_MODE_CHANNEL+1, buf+2, 10);
+  itoa(gpsModeChannel+1, buf+2, 10);
   drawStr_F(MENU_LEFT, y, F("GPS"));   
   u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
   y += char_height;
 
-  itoa(GPS_HOLD_VALUE, buf, 10);
+  itoa(gpsHoldValue, buf, 10);
   drawStr_F(MENU_LEFT, y, F("GPSHOLD"));   
   u8g.drawStr(screen_width-u8g.getStrWidth(buf), y, buf);
   y += char_height;
 
   // Print: PXX: 1111-2222
   drawStr_F(MENU_LEFT, y, F("PXX:"));
-  u8g.print(itoa(ACTIVE_PXX_MIN, buf, 10));  
+  u8g.print(itoa(activePXX_Min, buf, 10));  
   u8g.print("-");
-  u8g.print(itoa(ACTIVE_PXX_MAX, buf, 10));
+  u8g.print(itoa(activePXX_Max, buf, 10));
 
   y += char_height;
   
   // Print: CPPM: 1111-2222
   drawStr_F(MENU_LEFT, y, F("PPM:"));
-  u8g.print(itoa(ACTIVE_CPPM_MIN, buf, 10));
+  u8g.print(itoa(activeCPPM_Min, buf, 10));
   u8g.print("-");
-  u8g.print(itoa(ACTIVE_CPPM_MAX, buf, 10));
+  u8g.print(itoa(activeCPPM_Max, buf, 10));
 }
 #endif // #ifdef RELAY
 
@@ -628,6 +628,18 @@ void read_settings(void) {
   EEPROM.get(19, vrx_rssi_min);
   EEPROM.get(21, vrx_rssi_max);  
 #endif
+
+#ifdef RELAY
+  holdThrottleEnabled = EEPROM.read(23) != 0;
+  EEPROM.get(24, midThrottle);
+  EEPROM.get(26, minThrottle);
+  EEPROM.get(28, armCPPMChannel);
+  EEPROM.get(30, armPXXChannel);
+  EEPROM.get(32, armCPPM_Min);
+  EEPROM.get(34, armCPPM_Max);
+  EEPROM.get(36, armPXX_Min);
+  EEPROM.get(38, armPXX_Max);
+#endif
 }
 
 void init_settings(void) {
@@ -654,6 +666,18 @@ void init_settings(void) {
   activePXX_Max = ACTIVE_PXX_MAX;   // Max. value for make PXX control active;
   activeCPPM_Min = ACTIVE_CPPM_MIN; // Min. value for make CPPM control active;
   activeCPPM_Max = ACTIVE_CPPM_MAX; // Max. value for make CPPM control active;
+
+  holdThrottleEnabled = HOLD_THROTTLE_ENABLED; // Enable setting mid throttle (normally, 1500) for armed inactive copter and min throttle for disarmed inactive copter;
+  midThrottle = MID_THROTTLE;       // Mid throttle value;
+  minThrottle = MIN_THROTTLE;       // Min throttle value;
+
+// ARM channel signal boundaries for PXX or CPPM control; only armed copter will receive mid throttle when inactive; not armed will receive min throtlle;
+  armCPPMChannel = ARM_CPPM_CHANNEL; // Set it to channel to arm CPPM controlled copter; Allowed only channels CH5..CH8;
+  armPXXChannel  = ARM_PXX_CHANNEL;  // Set it to channel to arm PXX controlled copter; Allowed only channels CH5..CH8;
+  armCPPM_Min    = ARM_CPPM_MIN;     // Min. value for make CPPM arm;
+  armCPPM_Max    = ARM_CPPM_MAX;     // Max. value for make CPPM arm;
+  armPXX_Min     = ARM_PXX_MIN;      // Min. value for make PXX arm;
+  armPXX_Max     = ARM_PXX_MAX;      // Max. value for make PXX arm;
 #endif  
 
 #ifdef SHOW_RSSI
@@ -685,6 +709,19 @@ void write_settings(void) {
   EEPROM.put(19, vrx_rssi_min);
   EEPROM.put(21, vrx_rssi_max);  
 #endif
+
+#ifdef RELAY
+  EEPROM.update(23, holdThrottleEnabled ? 1 : 0);
+  EEPROM.put(24, midThrottle);
+  EEPROM.put(26, minThrottle);
+  EEPROM.put(28, armCPPMChannel);
+  EEPROM.put(30, armPXXChannel);
+  EEPROM.put(32, armCPPM_Min);
+  EEPROM.put(34, armCPPM_Max);
+  EEPROM.put(36, armPXX_Min);
+  EEPROM.put(38, armPXX_Max);
+#endif  
+
 }
 
 #ifndef OLED
@@ -1189,6 +1226,25 @@ void cmd_get_activeCPPM_Min() { Serial.print(activeCPPM_Min, DEC); }
 bool cmd_set_activeCPPM_Max() { return readChannelValue(activeCPPM_Max); }
 void cmd_get_activeCPPM_Max() { Serial.print(activeCPPM_Max, DEC); }
 
+bool cmd_set_holdThrottleEnabled() { return readBooleanValue(holdThrottleEnabled); }
+void cmd_get_holdThrottleEnabled() { printBooleanValue(holdThrottleEnabled); }
+bool cmd_set_midThrottle()    { return readChannelValue(midThrottle); }
+void cmd_get_midThrottle()    { Serial.print(midThrottle, DEC); }
+bool cmd_set_minThrottle()    { return readChannelValue(minThrottle); }
+void cmd_get_minThrottle()    { Serial.print(minThrottle, DEC); }
+bool cmd_set_armCPPMChannel() { return readChannelNumber(armCPPMChannel); }
+void cmd_get_armCPPMChannel() { printChannelNumber(armCPPMChannel); }
+bool cmd_set_armPXXChannel()  { return readChannelNumber(armPXXChannel); }
+void cmd_get_armPXXChannel()  { printChannelNumber(armPXXChannel); }
+bool cmd_set_armCPPM_Min()    { return readChannelValue(armCPPM_Min); }
+void cmd_get_armCPPM_Min()    { Serial.print(armCPPM_Min, DEC); }
+bool cmd_set_armCPPM_Max()    { return readChannelValue(armCPPM_Max); }
+void cmd_get_armCPPM_Max()    { Serial.print(armCPPM_Max, DEC); }
+bool cmd_set_armPXX_Min()     { return readChannelValue(armPXX_Min); }
+void cmd_get_armPXX_Min()     { Serial.print(armPXX_Min, DEC); }
+bool cmd_set_armPXX_Max()     { return readChannelValue(armPXX_Max); }
+void cmd_get_armPXX_Max()     { Serial.print(armPXX_Max, DEC); }
+
 #endif
 
 #ifdef SHOW_RSSI
@@ -1236,10 +1292,21 @@ static const char PROGMEM HELP_activePXX_Min[] = "Min. value in relay_channel to
 static const char PROGMEM HELP_activePXX_Max[] = "Max. value in relay_channel to make mission(PXX) drone active [900..2100]";
 static const char PROGMEM HELP_activeCPPM_Min[] = "Min. value in relay_channel to make relay(CPPM) drone active [900..2100]";
 static const char PROGMEM HELP_activeCPPM_Max[] = "Max. value in relay_channel to make relay(CPPM) drone active [900..2100]";
+
 #ifdef SHOW_RSSI
 static const char PROGMEM HELP_vrx_rssi_min[] = "Min. ADC value for for Video RX Rssi (0%) [0..1023]";
 static const char PROGMEM HELP_vrx_rssi_max[] = "Max. ADC value for for Video RX Rssi (100%) [0..1023]";
 #endif
+
+static const char PROGMEM HELP_holdThrottleEnabled[] = "Setting mid-throttle for inactive drone, enabled or disabled [on|off]";
+static const char PROGMEM HELP_midThrottle[] = "Channel value for mid-throttle (normally 1500) [900..2100]";
+static const char PROGMEM HELP_minThrottle[] = "Channel value for min-throttle (normally 1000) [900..2100]";
+static const char PROGMEM HELP_armPXXChannel[] = "Channel to arm PXX drone [CH5..CH8]";
+static const char PROGMEM HELP_armCPPMChannel[] = "Channel to arm CPPM drone [CH5..CH8]";
+static const char PROGMEM HELP_armPXX_Min[] = "Min. value in arm channel when PXX drone is armed [900..2100]";
+static const char PROGMEM HELP_armPXX_Max[] = "Max. value in arm channel when PXX drone is armed [900..2100]";
+static const char PROGMEM HELP_armCPPM_Min[] = "Min. value in arm channel when CPPM drone is armed [900..2100]";
+static const char PROGMEM HELP_armCPPM_Max[] = "Max. value in arm channel when CPPM drone is armed [900..2100]";
 
 static Variable CONFIG_VARS[] = {
    {"R9_mode",          cmd_set_mode,           cmd_get_mode,           FPSTR(HELP_mode)}
@@ -1260,6 +1327,16 @@ static Variable CONFIG_VARS[] = {
   ,{"active_PXX_max",   cmd_set_activePXX_Max,  cmd_get_activePXX_Max,  FPSTR(HELP_activePXX_Max)}
   ,{"active_CPPM_min",  cmd_set_activeCPPM_Min, cmd_get_activeCPPM_Min, FPSTR(HELP_activeCPPM_Min)}
   ,{"active_CPPM_max",  cmd_set_activeCPPM_Max, cmd_get_activeCPPM_Max, FPSTR(HELP_activeCPPM_Max)}
+
+  ,{"hold_throttle_enabled",  cmd_set_holdThrottleEnabled, cmd_get_holdThrottleEnabled, FPSTR(HELP_holdThrottleEnabled)}
+  ,{"mid_throttle",     cmd_set_midThrottle,    cmd_get_midThrottle,    FPSTR(HELP_midThrottle)}
+  ,{"min_throttle",     cmd_set_minThrottle,    cmd_get_minThrottle,    FPSTR(HELP_minThrottle)}
+  ,{"arm_PXX_channel",  cmd_set_armPXXChannel,  cmd_get_armPXXChannel,  FPSTR(HELP_armPXXChannel)}
+  ,{"arm_PXX_min",      cmd_set_armPXX_Min,     cmd_get_armPXX_Min,     FPSTR(HELP_armPXX_Min)}
+  ,{"arm_PXX_max",      cmd_set_armPXX_Max,     cmd_get_armPXX_Max,     FPSTR(HELP_armPXX_Max)}
+  ,{"arm_CPPM_channel", cmd_set_armCPPMChannel, cmd_get_armCPPMChannel, FPSTR(HELP_armCPPMChannel)}
+  ,{"arm_CPPM_min",     cmd_set_armCPPM_Min,    cmd_get_armCPPM_Min,    FPSTR(HELP_armCPPM_Min)}
+  ,{"arm_CPPM_max",     cmd_set_armCPPM_Max,    cmd_get_armCPPM_Max,    FPSTR(HELP_armCPPM_Max)}
 #endif
 };
 
@@ -1433,8 +1510,18 @@ void handle_status(bool active) {
       default: s = F("---");
     }
     Serial.println(s);
+
+    Serial.println(F("Hold throttle control is "));    
+    if (holdThrottleEnabled) {
+      Serial.print(F("ON. CPPM: "));
+      Serial.print(getCPPMArmed() ? F("ARMED") : F("disarmed"));
+      Serial.print(F(", PXX: "));
+      Serial.println(getPXXArmed() ? F("ARMED") : F("disarmed"));
+    } else {
+      Serial.println(F("OFF"));    
+    }
   } else {
-    Serial.println(" OFF");    
+    Serial.println(F("OFF"));    
   }
 #endif
 
