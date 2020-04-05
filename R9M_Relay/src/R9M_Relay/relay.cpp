@@ -93,9 +93,10 @@ void centerControlsAndHold(int16_t channels[], bool thrOverride, uint16_t thrOve
   channels[CH4] = 1500;
 }
 
-class Debouncer<T> {
+template <typename T>
+class Debouncer {
 public:
-  Debouncer(int8_t maxCount) : maxCount(maxCount), counter(0), initialized(false);
+  Debouncer(int8_t maxCount) : maxCount(maxCount), counter(0), initialized(false) {};
   T debounce(T value) {
     if (!initialized) {
       initialized = true;
@@ -120,9 +121,9 @@ private:
   int8_t counter;
   T stableValue;
   T prevValue;
-}
+};
 
-static Debouncer<bool> pxx_debouncer(ARM_DEBOUNCE_FRAMES);
+static Debouncer<bool> pxx_debouncer (ARM_DEBOUNCE_FRAMES);
 static Debouncer<bool> cppm_debouncer(ARM_DEBOUNCE_FRAMES);
 
 void updateChannelsRelay(int16_t channels[]) {
