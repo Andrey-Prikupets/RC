@@ -67,8 +67,8 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 //10  2000ms  Channels Min/Max page flip;
 //11  250ms   LED normal flashing;
 //12  50ms    LED flashing no-signal; 
-//13  1000ms  CLI periodic functions output; 
-TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000, 250, 50, 1000};
+//13  500ms   CLI periodic functions output; 
+TimerDelay delays[] = {500, 2000, 3000, 200, 1000, 8000, 4000, 4000, 200, 500, 2000, 250, 50, 500};
 MultiTimer timer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
 const uint8_t TIMER_MENU_FLASHING         = 0;

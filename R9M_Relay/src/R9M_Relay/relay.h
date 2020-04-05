@@ -57,8 +57,9 @@ extern uint16_t activeCPPM_Min;  // Min. value for make CPPM control active;
 extern uint16_t activeCPPM_Max;  // Max. value for make CPPM control active;
 
 extern bool     holdThrottleEnabled; // Enable setting mid throttle (normally, 1500) for armed inactive copter and min throttle for disarmed inactive copter;
-extern uint16_t midThrottle;         // Mid throttle value;
-extern uint16_t minThrottle;         // Min throttle value;
+extern uint16_t midThrottle;         // Middle throttle value;
+extern uint16_t minThrottle;         // Minimum throttle value to turn off motors;
+extern uint16_t safeThrottle;        // Minimum safe throttle value when copter considered flying;
 
 // ARM channel signal boundaries for PXX or CPPM control; only armed copter will receive mid throttle when inactive; not armed will receive min throtlle;
 extern uint8_t  armCPPMChannel;  // Set it to channel to arm CPPM controlled copter; Allowed only channels CH5..CH8;
@@ -70,6 +71,8 @@ extern uint16_t armPXX_Max;      // Max. value for make PXX arm;
 
 bool getCPPMArmed();
 bool getPXXArmed();
+bool getCPPMFlying();
+bool getPXXFlying();
 
 #endif // #ifdef RELAY
 

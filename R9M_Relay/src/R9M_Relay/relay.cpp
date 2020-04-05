@@ -17,6 +17,7 @@ uint16_t activeCPPM_Max = ACTIVE_CPPM_MAX; // Max. value for make CPPM control a
 bool     holdThrottleEnabled = HOLD_THROTTLE_ENABLED; // Enable setting mid throttle (normally, 1500) for armed inactive copter and min throttle for disarmed inactive copter;
 uint16_t midThrottle = MID_THROTTLE;       // Mid throttle value;
 uint16_t minThrottle = MIN_THROTTLE;       // Min throttle value;
+uint16_t safeThrottle = SAFE_THROTTLE;     // Minimum safe throttle value when copter considered flying;
 
 // ARM channel signal boundaries for PXX or CPPM control; only armed copter will receive mid throttle when inactive; not armed will receive min throtlle;
 uint8_t  armCPPMChannel = ARM_CPPM_CHANNEL; // Set it to channel to arm CPPM controlled copter; Allowed only channels CH5..CH8;
@@ -36,6 +37,8 @@ static int8_t oldActive = RELAY_ACTIVE_NONE;
 static bool channelsInitialized = false;
 static bool pxx_armed = false;
 static bool cppm_armed = false;
+static bool pxx_flying = false;
+static bool cppm_flying = false;
 
 void relayInit() {
   pinMode(PIN_CAMERA_SEL, OUTPUT);
@@ -75,6 +78,36 @@ void dumpChannels(int16_t channels[], int8_t size) {
 }
 #endif
 
+// Debouncing for Arm signal to protect from accidental signal spikes which can arm copter and force mid-throttle appiled;
+template <typename T>
+class Debouncer {
+public:
+  Debouncer(int8_t maxCount, T initialValue) : maxCount(maxCount), counter(0), stableValue(initialValue), prevValue(initialValue) {};
+  T debounce(T value) {
+    if (prevValue == value) {
+      if (counter < maxCount) {
+        counter++;
+      } else {
+        stableValue = value;
+      }
+    } else { // value == stableValue || value != prevValue;
+      prevValue = value;
+      counter = 0;
+    }
+    return stableValue;
+  }
+private:
+  int8_t maxCount;
+  int8_t counter;
+  T stableValue;
+  T prevValue;
+};
+
+static Debouncer<bool> pxx_armed_debouncer (ARMED_DEBOUNCE_FRAMES, false);
+static Debouncer<bool> cppm_armed_debouncer(ARMED_DEBOUNCE_FRAMES, false);
+static Debouncer<bool> pxx_flying_debouncer (FLYING_DEBOUNCE_FRAMES, false);
+static Debouncer<bool> cppm_flying_debouncer(FLYING_DEBOUNCE_FRAMES, false);
+
 bool inRange(uint16_t x, uint16_t min, uint16_t max) {
   return x >= min && x <= max;
 }
@@ -93,43 +126,7 @@ void centerControlsAndHold(int16_t channels[], bool thrOverride, uint16_t thrOve
   channels[CH4] = 1500;
 }
 
-template <typename T>
-class Debouncer {
-public:
-  Debouncer(int8_t maxCount) : maxCount(maxCount), counter(0), initialized(false) {};
-  T debounce(T value) {
-    if (!initialized) {
-      initialized = true;
-      stableValue = value;
-      prevValue = value;
-    } else
-    if (prevValue == value) {
-      if (counter < maxCount) {
-        counter++;
-      } else {
-        stableValue = value;
-      }
-    } else { // value == stableValue || value != prevValue;
-      prevValue = value;
-      counter = 0;
-    }
-    return stableValue;
-  }
-private:
-  int8_t maxCount;
-  bool initialized;
-  int8_t counter;
-  T stableValue;
-  T prevValue;
-};
-
-static Debouncer<bool> pxx_debouncer (ARM_DEBOUNCE_FRAMES);
-static Debouncer<bool> cppm_debouncer(ARM_DEBOUNCE_FRAMES);
-
 void updateChannelsRelay(int16_t channels[]) {
-  pxx_armed = channelsInitialized && pxx_debouncer.debounce(inRange(channels[armPXXChannel], armPXX_Min, armPXX_Max));
-  cppm_armed = channelsInitialized && cppm_debouncer.debounce(inRange(channels[armCPPMChannel], armCPPM_Min, armCPPM_Max));
-
   uint16_t value = channels[relayChannel];
   if (relayEnabled && inRange(value, activePXX_Min, activePXX_Max)) {
     setRelayActive(RELAY_ACTIVE_PXX);
@@ -141,18 +138,24 @@ void updateChannelsRelay(int16_t channels[]) {
   }
 
   if (active == RELAY_ACTIVE_PXX || !channelsInitialized) {
+    // Accept PXX armed status only when PXX is enabled;
+    pxx_armed = channelsInitialized && pxx_armed_debouncer.debounce(inRange(channels[armPXXChannel], armPXX_Min, armPXX_Max));
+    pxx_flying = pxx_flying_debouncer.debounce(channels[CH3] >= safeThrottle);
     memcpy(channels_out_pxx, channels, NUM_CHANNELS_PXX*sizeof(channels[0]));
   } 
   if (active == RELAY_ACTIVE_CPPM || !channelsInitialized) {
+    // Accept CPPM armed status only when CPPM is enabled;
+    cppm_armed = channelsInitialized && cppm_armed_debouncer.debounce(inRange(channels[armCPPMChannel], armCPPM_Min, armCPPM_Max));
+    cppm_flying = cppm_flying_debouncer.debounce(channels[CH3] >= safeThrottle);
     memcpy(channels_out_cppm, channels, NUM_CHANNELS_CPPM*sizeof(channels[0]));  
   }
 
   if (relayEnabled) {
     if (active != RELAY_ACTIVE_PXX) {
-      centerControlsAndHold(channels_out_pxx, holdThrottleEnabled, pxx_armed ? midThrottle : minThrottle);
+      centerControlsAndHold(channels_out_pxx, holdThrottleEnabled, pxx_armed && pxx_flying ? midThrottle : minThrottle);
     }
     if (active != RELAY_ACTIVE_CPPM) {
-      centerControlsAndHold(channels_out_cppm, holdThrottleEnabled, cppm_armed ? midThrottle : minThrottle);
+      centerControlsAndHold(channels_out_cppm, holdThrottleEnabled, cppm_armed && cppm_flying ? midThrottle : minThrottle);
     }
 
     if (active == RELAY_ACTIVE_PXX) {
@@ -180,6 +183,14 @@ bool getCPPMArmed() {
 
 bool getPXXArmed() {
   return pxx_armed;
+}
+
+bool getCPPMFlying() {
+  return cppm_flying;  
+}
+
+bool getPXXFlying() {
+  return pxx_flying;  
 }
 
 #endif
