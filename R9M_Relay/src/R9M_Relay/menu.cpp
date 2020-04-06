@@ -1510,8 +1510,9 @@ void handle_status(bool active) {
   } else {
     Serial.println();
   }
+  Serial.println(CPPM.getOutputEnabled() ? F("CPPM: Enabled") : F("CPPM: Disabled"));
 
-  Serial.print(F("Band: "));
+  Serial.print(F("R9 Band: "));
   Serial.print(getBandStrShort());
   Serial.print(F(", "));
   Serial.println(getPowerStr()); 

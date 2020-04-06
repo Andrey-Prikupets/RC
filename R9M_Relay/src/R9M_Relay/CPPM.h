@@ -169,7 +169,7 @@ class CPPM_Class
 		uint16_t oservos[CPPM_MSERVO]; // cppm output servo pulse width
 
 		uint8_t fail_reason;
-    bool outputEnabled;
+		bool outputEnabled;
 
   public:
 
@@ -193,8 +193,8 @@ class CPPM_Class
 
 		void write_us(int n, int v); // +2015-04-06
 
-    void enableOutput(boolean enable);
-    bool getOutputEnabled() { return outputEnabled; }
+		void enableOutput(boolean enable);
+		bool getOutputEnabled() { return outputEnabled; }
 
 		uint8_t getFailReason(void) { return fail_reason; } 
 		bool getErrorCount(void) { return errors; } 
