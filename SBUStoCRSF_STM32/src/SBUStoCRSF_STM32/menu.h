@@ -34,8 +34,6 @@ extern Seq SEQ_MODE_NO_SBUS;
 extern Seq SEQ_MODE_SBUS_LOST;
 extern Seq SEQ_MODE_GOT_SBUS;
 
-extern bool channelValid(int16_t x);
-
 extern bool sbusActive;
 extern int16_t channels[NUM_CHANNELS_SBUS];
 

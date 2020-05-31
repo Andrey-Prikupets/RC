@@ -27,7 +27,7 @@ const int8_t WATCHDOG_PIN = PB14;
 NEW_SEQ (SEQ_MODE_SBUS_LOST,    BEEP_MS(300), PAUSE_MS(70), BEEP_MS(200), PAUSE_MS(50), BEEP_MS(100));
 NEW_SEQ (SEQ_MODE_NO_SBUS,      BEEP_MS(30),  PAUSE_MS(20), BEEP_MS(100), PAUSE_MS(50), BEEP_MS(50), PAUSE_MS(20), BEEP_MS(30));
 NEW_SEQ (SEQ_MODE_GOT_SBUS,     BEEP_MS(100), PAUSE_MS(50), BEEP_MS(200), PAUSE_MS(70), BEEP_MS(300));
-NEW_SEQ (SEQ_MODE_SBUS_MISSED,  BEEP_MS(10));
+// NEW_SEQ (SEQ_MODE_SBUS_MISSED,  BEEP_MS(10));
 
 NEW_SEQ (SEQ_BATTERY_1S,        BEEP_MS(1000));
 NEW_SEQ (SEQ_BATTERY_2S,        BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200));
@@ -36,7 +36,8 @@ NEW_SEQ (SEQ_BATTERY_4S,        BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE
 NEW_SEQ (SEQ_BATTERY_LOW,       BEEP_MS(200), PAUSE_MS(200), BEEP_MS(400), PAUSE_MS(200));
 NEW_SEQ (SEQ_BATTERY_MIN,       BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(200));
 
-Seq* seqs[] = {&SEQ_MODE_SBUS_LOST, &SEQ_MODE_NO_SBUS, &SEQ_MODE_GOT_SBUS, &SEQ_MODE_SBUS_MISSED,
+Seq* seqs[] = {&SEQ_MODE_SBUS_LOST, &SEQ_MODE_NO_SBUS, &SEQ_MODE_GOT_SBUS, 
+               // &SEQ_MODE_SBUS_MISSED,
                &SEQ_BATTERY_1S, &SEQ_BATTERY_2S, &SEQ_BATTERY_3S, &SEQ_BATTERY_4S, &SEQ_BATTERY_LOW, &SEQ_BATTERY_MIN};
 Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Seq*));
 
@@ -63,11 +64,6 @@ const uint8_t TIMER_LED_INVALID_FLASHING = 7;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
-// Servo impulse range where it is valid;
-// Note: FrSky X4R in Failsafe with No Pulses setting continues emitting impulses of 800-850us;
-#define MIN_SERVO_US 900
-#define MAX_SERVO_US 2100
-
 // Serial ports used;
 #ifdef CORE_OFFICIAL
   HardwareSerial sbusSerial(USART1); // The default pinout of Serial1 is TX - PA9 ( Arduino D8) and RX - PA10 (Arduino D2).
@@ -89,7 +85,7 @@ BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
   void setupCrossfireTimer();  
 #endif
 
-SBUS sbus (sbusSerial);
+SBUS sbus (sbusSerial, MAX_ALLOWED_MISSED_FRAMES);
 CrossfirePulsesData crossfire;
 
 bool enableCrossfire = false;
@@ -243,13 +239,18 @@ void initChannels() {
 #ifdef DEBUG_CHANNELS
 void debugChannels() {
     Serial.print("CPPM: ");
-    if (!sbus.hasSignal())
+    if (!sbus.hasSBUS())
       Serial.print("NO SIG ");
 #ifdef DEBUG_SBUS
     Serial.print("F: ");
     Serial.print(sbus.getFramesCount(), DEC);
     Serial.print(", B: ");
     Serial.print(sbus.getBytesCount(), DEC);
+    Serial.print(", ");
+    Serial.print(", E: ");
+    Serial.print(sbus.getErrorsCount(), DEC);
+    Serial.print(", I: ");
+    Serial.print(sbus.getInvalidChannelsCount(), DEC);
     Serial.print(", ");
 #endif        
   for (int i=1; i <= NUM_CHANNELS_SBUS; ++i) {
@@ -271,13 +272,15 @@ void debugChannels() {
 #ifdef DEBUG_SBUS_RAW_CHANNELS
 void debugSBUSRawChannels() {
     Serial.print("SBUS: ");
-    if (!sbus.hasSignal())
-      Serial.print("NO SIG ");
+    if (!sbus.hasSBUS())
+      Serial.print("NO SBUS ");
 #ifdef DEBUG_SBUS
     Serial.print("F: ");
     Serial.print(sbus.getFramesCount(), DEC);
     Serial.print(", B: ");
     Serial.print(sbus.getBytesCount(), DEC);
+    Serial.print(", E: ");
+    Serial.print(sbus.getErrorsCount(), DEC);
     Serial.print(", ");
 #endif        
   for (int i=1; i <= NUM_CHANNELS_SBUS; ++i) {
@@ -296,14 +299,6 @@ void debugSBUSRawChannels() {
 }
 #endif
 
-static byte missed_frames = 0;
-
-extern bool channelValid(int16_t x);
-
-bool channelValid(int16_t x) {
-    return (x >= MIN_SERVO_US && x <= MAX_SERVO_US);
-}
-
 const float CPPM_CENTER = (CPPM_RANGE_MAX+CPPM_RANGE_MIN)/2.0;
 const float CPPM_HALF_RANGE = (CPPM_RANGE_MAX-CPPM_RANGE_MIN)/2.0;
 const float CRSF_CENTER = (CROSSFIRE_RANGE_MIN+CROSSFIRE_RANGE_MAX)/2.0;
@@ -312,7 +307,7 @@ const float CRSF_HALF_RANGE_CORR = CRSF_HALF_RANGE*CPPM_TO_CRSF_EXTEND_COEFF;
 const float CRSF_CENTER_CORR = CRSF_CENTER+CPPM_TO_CRSF_CENTER_SHIFT;
 const float CPPM_TO_CRSF_CORR = CRSF_HALF_RANGE_CORR/CPPM_HALF_RANGE;
 
-void doPrepare(bool reset_frames) {
+void doPrepare() {
     // Mapping channels from CPPM range to CrossFire;
     int16_t standardChannels[NUM_CHANNELS_SBUS];
 #ifdef DEBUG_STD_CHANNELS
@@ -332,25 +327,16 @@ void doPrepare(bool reset_frames) {
   Serial.println();  
 #endif
   createCrossfireChannelsFrame(&crossfire, standardChannels, NUM_CHANNELS_SBUS);
-  if (reset_frames) {
-    missed_frames = 0;
-  }
-  flashLED(reset_frames);
+  flashLED(sbus.isValid());
 }
 
-#define MAX_ALLOWED_MISSED_FRAMES 10
+#define MAX_ALLOWED_MISSED_FRAMES 100
 
 void loop() {
-    bool sbusIsValid = sbus.hasSignal() && !sbus.signalLossActive() && !sbus.failsafeActive();
-    if (sbusIsValid) {
+    if (sbus.isValid()) {
         for(uint8_t i = 0; i < NUM_CHANNELS_SBUS; i++) {
             // SBUS range is different from CPPM, but getChannels already returns channels mapped to CPPM range;
-            int16_t x = sbus.getChannel(i+1); // 988..2012
-            if (!channelValid(x)) {
-              sbusIsValid = false; 
-            } else {
-              channels[i] = x;              
-            }
+            channels[i] = sbus.getChannel(i+1); // 988..2012 
         }
     }
 
@@ -363,23 +349,19 @@ void loop() {
 #endif          
 
     // If sbus channels are invalid, these channels should not be sent to Crossfire, but should be displayed in OLED;
-    if (sbusIsValid) {
-        doPrepare(true);
+    doPrepare();
+    if (sbus.isAcceptable()) {
         setSBUS_Obtained();
         enableCrossfire = true;        
     } else {
-        doPrepare(false);            
+        setSBUS_Lost();
+        enableCrossfire = false;
     }
-
-    if (sbus.hasSignal() && missed_frames < MAX_ALLOWED_MISSED_FRAMES) {
+    /*
       if (missed_frames == 1) { // Beep on 1st missed SBUS frame;
         beeper1.play(&SEQ_MODE_SBUS_MISSED);            
       }
-      missed_frames++;
-    } else {
-      setSBUS_Lost();
-      enableCrossfire = false;
-    }
+    */
     
     beeper1.loop();    
     if (mTimer1.isTriggered(TIMER_BATTERY_LOOP)) {

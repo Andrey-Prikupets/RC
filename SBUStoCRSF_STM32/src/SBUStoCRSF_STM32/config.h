@@ -26,6 +26,15 @@ const float DIVIDER = (2200.0f+10000.0f)/2200.0f * correction; // Resistor divid
 // May change to lower numbers if needed;
 #define NUM_CHANNELS_SBUS 16
 
+// Maximum number of consequent missed or signal lost SBUS frames or frames with invalid channel values to disable CrossFire and renders them to its FailSafe;
+// Note: FailSafe condition in SBUS reflects in CrossFire FailSafe without delay;
+#define MAX_ALLOWED_MISSED_FRAMES 50
+
+// Servo impulse range where it is valid;
+// Note: FrSky X4R in Failsafe with No Pulses setting continues emitting impulses of 800-850us;
+#define MIN_SERVO_US 900
+#define MAX_SERVO_US 2100
+
 // Standard CPPM Channels impulse ranges that SBUS can handle;
 #define CPPM_RANGE_MIN 857
 #define CPPM_RANGE_MAX 2143
