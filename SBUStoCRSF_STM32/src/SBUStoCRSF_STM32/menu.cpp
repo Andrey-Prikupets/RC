@@ -132,7 +132,6 @@ void drawChannels(void) {
     invalidValueFlashing = !invalidValueFlashing;
   }
   
-  // if (sbus.hasSBUS()) {
 #ifndef DEBUG_SBUS
     int maxChan = NUM_CHANNELS_SBUS;
 #else
@@ -149,7 +148,11 @@ void drawChannels(void) {
       }
       itoa(i, buf+j, 10);
       buf[2]=':';
+#ifndef DEBUG_SBUS
+      int16_t x = sbus.getChannelRaw(i);
+#else
       int16_t x = channels[i-1];
+#endif
       if (SBUS::channelValid(x) || invalidValueFlashing) {
         itoa(x, buf+3, 10);
       } else {
@@ -160,6 +163,11 @@ void drawChannels(void) {
   
     setInfoPos(INFO_FAILSAFE);
     char* p = buf;
+    if (sbus.isValid()) {
+      *p++ = 'O';
+      *p++ = 'K';
+      *p++ = ' ';
+    }
     if (sbus.signalLossActive()) {
       *p++ = 'S';
       *p++ = 'L';
@@ -171,7 +179,6 @@ void drawChannels(void) {
     }
     *p++ = 0;
     u8g.print(buf);
-  // }       
 
 #ifdef DEBUG_SBUS
   setInfoPos(INFO_SBUS_FRAMES);
@@ -183,15 +190,13 @@ void drawChannels(void) {
   u8g.print(F("Er:"));
   itoa(sbus.getErrorsCount(), buf, 10);
   u8g.print(buf);
-
   drawPos_F (8+1, sbus.getInvalidChannelsCount(), F("In:"));
-  drawPos_F (8+2, sbus.getMissedFrames(), F("Mi::"));
-  drawPos_F (8+3, sbus.getBytesCount(), F("By:"));
-  drawPos_F (8+4, sbus.getOutOfSyncFrames(), F("Ou:"));
-  drawPos_F (8+5, sbus.getTimeoutsCount(), F("Ti:"));
-  drawPos_F (8+6, sbus.getSignalLossFrames(), F("SL:"));
-  drawPos_F (8+7, sbus.getFailsafeFrames(), F("FS:"));
-  drawPos_F (8+8, sbus.getMissedFramesOverflows(), F("nA:"));
+  drawPos_F (8+2, sbus.getMissedFrames(), F("Mi:"));
+  drawPos_F (8+3, sbus.getOutOfSyncFrames(), F("Ou:"));
+  drawPos_F (8+4, sbus.getTimeoutsCount(), F("Ti:"));
+  drawPos_F (8+5, sbus.getSignalLossFrames(), F("SL:"));
+  drawPos_F (8+6, sbus.getFailsafeFrames(), F("FS:"));
+  // drawPos_F (8+3, sbus.getBytesCount(), F("By:"));
 #endif        
 
 #ifdef DEBUG_OLED_SPEED

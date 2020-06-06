@@ -10,73 +10,72 @@
 #define SBUS_STARTBYTE         0x0f
 #define SBUS_ENDBYTE           0x00
 
-const unsigned long SBUS_TIMEOUT_MS = 20;
+#define SBUS_TIMEOUT_MS 20
 
 // SBUS Channels range
 #define SBUS_RANGE_MIN 0
 #define SBUS_RANGE_MAX 2047 // 0x7FF
 
+#define MAX_SBUS_CHANNELS 18
+#define SBUS_FRAME_LENGTH 25
+
 class SBUS {
 	public:
-		SBUS(HardwareSerial & serial, unsigned int missedFramesLimit) : 
+		SBUS(HardwareSerial & serial, unsigned int recoveryTimeMs) : 
 			_serial (serial), 
-			_missedFramesLimit(missedFramesLimit),
-			_missedFrames(0),
-			_invalidChannelsCount(0),
-#ifdef DEBUG_SBUS
-			_framesCount(0),
-			_bytesCount(0),
-#endif    
-			_errorsCount(0),
-      _timeoutsCount(0),
-			_gotSBUS(false) {}
+			_recoveryTimeMs(recoveryTimeMs) {};
 		void begin();
-		void process();
-		bool signalLossActive() { return _signalLossActive; }
-		bool failsafeActive() { return _failsafeActive; }
-		bool hasSBUS() { return _hasSBUS; }
+		bool received(); // post-process and fill shadow channels;
+    void receive(); // call from SBUS interrupt;
+		bool signalLossActive();
+		bool failsafeActive();
 		bool isValid() { return _isValid; }
-		bool isAcceptable();
-		unsigned int getErrorsCount() { return _errorsCount; }
-		unsigned int getInvalidChannelsCount() { return _invalidChannelsCount; }
-    unsigned int getMissedFrames() { return _missedFrames; }
-    unsigned int getTimeoutsCount() { return _timeoutsCount; }
-    unsigned int getOutOfSyncFrames() { return _outOfSyncFrames; }
-    unsigned int getSignalLossFrames() { return _signalLossFrames; }
-    unsigned int getFailsafeFrames() { return _failsafeFrames; }
-    unsigned int getMissedFramesOverflows() { return _missedFramesOverflows; }
 #ifdef DEBUG_SBUS
-		unsigned long getFramesCount();
-		unsigned long getBytesCount();
+		uint32_t getErrorsCount() { return _errorsCount; }
+		uint32_t getInvalidChannelsCount() { return _invalidChannelsCount; }
+    uint32_t getMissedFrames() { return _missedFrames; }
+    uint32_t getTimeoutsCount() { return _timeoutsCount; }
+    uint32_t getOutOfSyncFrames() { return _outOfSyncFrames; }
+    uint32_t getSignalLossFrames() { return _signalLossFrames; }
+    uint32_t getFailsafeFrames() { return _failsafeFrames; }
+		uint32_t getFramesCount() { return _framesCount; }
+		uint32_t getBytesCount() { return _bytesCount; }
 #endif    
 		// channels start from 1 to 18
 		// returns value 988..2012 (cleanflight friendly)
-		uint16_t getChannel(uint8_t channel); // channel is 1-based;
-		uint16_t getRawChannel(uint8_t channel); // channel is 1-based;
+		uint16_t getChannel(uint8_t channel); // reads shadowed channel (1-based);
+		uint16_t getRawChannel(uint8_t channel); // reads raw channel (1-based);
 		static bool channelValid(int16_t x) { return (x >= MIN_SERVO_US && x <= MAX_SERVO_US); }
 	private:
-		volatile int _channels[18];
-		HardwareSerial & _serial;
-    unsigned int _missedFramesLimit;
-		volatile bool _signalLossActive;
-		volatile bool _failsafeActive;
-		volatile bool _hasSBUS;
-		volatile bool _isValid;
-		volatile bool _gotSBUS;
-		volatile unsigned long timeoutMs;
-		//void check();
+    HardwareSerial & _serial;
+    unsigned int _signalLostTimeMs;
+    
+    volatile byte buffer[SBUS_FRAME_LENGTH];
+    volatile byte buffer_index = 0;
+		volatile int _channels[MAX_SBUS_CHANNELS];
+    volatile uint32_t timeoutMs;
+    volatile bool _gotSBUS;
+    volatile bool _signalLossActive;
+    volatile bool _failsafeActive;
+    volatile bool _hasSBUS;
+
+    int channels[MAX_SBUS_CHANNELS];
+
+		bool _isValid;
+    uint32_t _recoveryTimeMs;
 #ifdef DEBUG_SBUS
-		volatile unsigned long _framesCount;
-		volatile unsigned long _bytesCount;
+		volatile uint32_t _framesCount; // number of received frames;
+		volatile uint32_t _bytesCount; // number of received bytes;
+		volatile uint32_t _missedFrames; // number of SBUS timeout in serial stream;
+    volatile uint32_t _outOfSyncFrames; // number of SBUS corrupted frames without stop-byte;
+		volatile uint32_t _signalLossFrames; // SL frames count;
+    volatile uint32_t _failsafeFrames; // FS frames count;
+
+    uint32_t _invalidChannelsCount; // number of SBUS frames with channels out of valid range;
+    uint32_t _timeoutsCount; // number of SBUS stream interruptions;
+    uint32_t _errorsCount; // number of signal lost, missed or invalid channels conditions longer than recovery time;
+    bool _prevHasSBUS; // during the last check SBUS was received;
 #endif    
-		volatile unsigned int _errorsCount;
-		volatile unsigned int _missedFrames;
-    volatile unsigned int _outOfSyncFrames;
-		volatile unsigned int _invalidChannelsCount;
-    volatile unsigned int _timeoutsCount;
-		volatile unsigned int _signalLossFrames;
-    volatile unsigned int _failsafeFrames;
-    volatile unsigned int _missedFramesOverflows;
 };
 
 #endif

@@ -27,7 +27,6 @@ const int8_t WATCHDOG_PIN = PB14;
 NEW_SEQ (SEQ_MODE_SBUS_LOST,    BEEP_MS(300), PAUSE_MS(70), BEEP_MS(200), PAUSE_MS(50), BEEP_MS(100));
 NEW_SEQ (SEQ_MODE_NO_SBUS,      BEEP_MS(30),  PAUSE_MS(20), BEEP_MS(100), PAUSE_MS(50), BEEP_MS(50), PAUSE_MS(20), BEEP_MS(30));
 NEW_SEQ (SEQ_MODE_GOT_SBUS,     BEEP_MS(100), PAUSE_MS(50), BEEP_MS(200), PAUSE_MS(70), BEEP_MS(300));
-// NEW_SEQ (SEQ_MODE_SBUS_MISSED,  BEEP_MS(10));
 
 NEW_SEQ (SEQ_BATTERY_1S,        BEEP_MS(1000));
 NEW_SEQ (SEQ_BATTERY_2S,        BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200));
@@ -37,7 +36,6 @@ NEW_SEQ (SEQ_BATTERY_LOW,       BEEP_MS(200), PAUSE_MS(200), BEEP_MS(400), PAUSE
 NEW_SEQ (SEQ_BATTERY_MIN,       BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(100), BEEP_MS(200), PAUSE_MS(200));
 
 Seq* seqs[] = {&SEQ_MODE_SBUS_LOST, &SEQ_MODE_NO_SBUS, &SEQ_MODE_GOT_SBUS, 
-               // &SEQ_MODE_SBUS_MISSED,
                &SEQ_BATTERY_1S, &SEQ_BATTERY_2S, &SEQ_BATTERY_3S, &SEQ_BATTERY_4S, &SEQ_BATTERY_LOW, &SEQ_BATTERY_MIN};
 Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Seq*));
 
@@ -85,7 +83,7 @@ BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
   void setupCrossfireTimer();  
 #endif
 
-SBUS sbus (sbusSerial, MAX_ALLOWED_MISSED_FRAMES);
+SBUS sbus (sbusSerial, SBUS_RECOVERY_TIME_MS);
 CrossfirePulsesData crossfire;
 
 bool enableCrossfire = false;
@@ -137,7 +135,7 @@ void sbusProcess(HardwareTimer*)
 void sbusProcess()
 #endif
 {
-  sbus.process();
+  sbus.receive();
 }
 
 #ifdef CORE_OFFICIAL
@@ -238,8 +236,8 @@ void initChannels() {
 
 #ifdef DEBUG_CHANNELS
 void debugChannels() {
-    Serial.print("CPPM: ");
-    if (!sbus.hasSBUS())
+    Serial.print("SBUS: ");
+    if (!sbus.isValid())
       Serial.print("NO SIG ");
 #ifdef DEBUG_SBUS
     Serial.print("F: ");
@@ -271,8 +269,8 @@ void debugChannels() {
 
 #ifdef DEBUG_SBUS_RAW_CHANNELS
 void debugSBUSRawChannels() {
-    Serial.print("SBUS: ");
-    if (!sbus.hasSBUS())
+    Serial.print("SBUS RAW: ");
+    if (!sbus.isValid())
       Serial.print("NO SBUS ");
 #ifdef DEBUG_SBUS
     Serial.print("F: ");
@@ -330,10 +328,8 @@ void doPrepare() {
   flashLED(sbus.isValid());
 }
 
-#define MAX_ALLOWED_MISSED_FRAMES 100
-
 void loop() {
-    if (sbus.isValid()) {
+    if (sbus.received()) {
         for(uint8_t i = 0; i < NUM_CHANNELS_SBUS; i++) {
             // SBUS range is different from CPPM, but getChannels already returns channels mapped to CPPM range;
             channels[i] = sbus.getChannel(i+1); // 988..2012 
@@ -350,18 +346,13 @@ void loop() {
 
     // If sbus channels are invalid, these channels should not be sent to Crossfire, but should be displayed in OLED;
     doPrepare();
-    if (sbus.isAcceptable()) {
+    if (sbus.isValid()) {
         setSBUS_Obtained();
         enableCrossfire = true;        
     } else {
         setSBUS_Lost();
         enableCrossfire = false;
     }
-    /*
-      if (missed_frames == 1) { // Beep on 1st missed SBUS frame;
-        beeper1.play(&SEQ_MODE_SBUS_MISSED);            
-      }
-    */
     
     beeper1.loop();    
     if (mTimer1.isTriggered(TIMER_BATTERY_LOOP)) {

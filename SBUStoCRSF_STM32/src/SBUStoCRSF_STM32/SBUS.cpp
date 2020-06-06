@@ -41,15 +41,14 @@ void SBUS::begin() {
 #endif    
 }
 
-void SBUS::process() {
-	// while (_serial.available() > 25)
-	// {
-		// _serial.read();
-	// }
-	static byte buffer[25];
-	static byte buffer_index = 0;
-
-	bool gotData = false;
+void SBUS::receive() {
+	// leave only 25 bytes in the serial buffer;
+	// while (_serial.available() > 25) {
+	//	_serial.read();
+	//}
+ 
+	bool frameReceived = false;
+//  if (_serial.available() >= 25) {
 	while (_serial.available()) {
 		byte rx = _serial.read();
 #ifdef DEBUG_SBUS
@@ -62,11 +61,11 @@ void SBUS::process() {
 
 		buffer[buffer_index++] = rx;
 
-		if (buffer_index == 25) {
+		if (buffer_index == SBUS_FRAME_LENGTH) {
 			buffer_index = 0;
-			if (buffer[24] != SBUS_ENDBYTE) {
+			if (buffer[SBUS_FRAME_LENGTH-1] != SBUS_ENDBYTE) {
 				//incorrect end byte, out of sync
-       _outOfSyncFrames++;
+        _outOfSyncFrames++;
 				continue;
 			}
 
@@ -92,83 +91,88 @@ void SBUS::process() {
 			_channels[17] = (b23 & FLAG_CHANNEL_18) ? CHANNEL_MAX: CHANNEL_MIN; 
 			_signalLossActive = b23 & FLAG_SIGNAL_LOSS;
 			_failsafeActive = b23 & FLAG_FAILSAFE;
-      if (_signalLossActive) {
-        _signalLossFrames++;
-      }
       if (_failsafeActive) {
         _failsafeFrames++;
+      } else
+      if (_signalLossActive) {
+        _signalLossFrames++;
       }
 #ifdef DEBUG_SBUS
 			_framesCount++;
 #endif    
-			gotData = true;
+			frameReceived = true;
 		}
 	}
+  //    while (_serial.available()) {
+  //      _serial.read();
+  //    }
+  //}
 
-	unsigned long ms = millis();
-	if (!gotData) {
-		_hasSBUS = (ms <= timeoutMs);	// false if have not received SBUS frame within the timeout;	
+	if (!frameReceived) {
+		_hasSBUS = millis() <= timeoutMs;	// false if have not received SBUS frame within the timeout;	
+    if (!_hasSBUS) {
+      // clean up the buffer and UART FIFO;
+ //     buffer_index = 0;
+ //     while (_serial.available()) {
+ //       _serial.read();
+ //      }
+      _missedFrames++;
+    }
 	} else {
 		timeoutMs = millis()+SBUS_TIMEOUT_MS;
 		_hasSBUS = true;
 		_gotSBUS = true;
 	}
+}
 
+bool SBUS::received() {
+  bool prevValid = _isValid;
   _isValid = false;
-  if (!_gotSBUS)
-    return; // return if not ever received valid SBUS frame; is RX disconnected?
-    
-  bool hasChannels = _hasSBUS && !_signalLossActive && !_failsafeActive; // it might be SL,FS from this frame or previous frame;
-  static bool prevHasSBUS = false;
-  bool lostSBUS = !_hasSBUS && prevHasSBUS;
-  prevHasSBUS = _hasSBUS;
+
+  noInterrupts(); 
+  bool lostSBUS = !_hasSBUS && _prevHasSBUS;
+  _prevHasSBUS = _hasSBUS;
   if (lostSBUS) {
-    _timeoutsCount++;    
+    _timeoutsCount++; // Serial connection timeout - was RX disconnected?  
   }
 
+  if (!_gotSBUS || _failsafeActive) {
+    interrupts();
+    return _isValid; // return if not ever received valid SBUS frame or in case of FS;
+  }
+    
+  bool hasChannels = _hasSBUS && !_signalLossActive;
   bool channelsValid = true;
   if (hasChannels) {
     for(uint8_t i = 0; i < 15; i++) { // Channels 16 and 17 are not checked;
       int x = _channels[i];      
       if (x < SBUS_VALID_MIN || x > SBUS_VALID_MAX) {
         channelsValid = false; 
-        if (gotData) { // Increment only for just received frame;
-          _invalidChannelsCount++; // Invalid channels errors;
-        }
+        _invalidChannelsCount++; // Invalid channels errors;
         break;
       }
     }
   }
 
   if (hasChannels && channelsValid) {
-    _missedFrames = 0;
     _isValid = true;
-  } else {
-    if ((_hasSBUS && _signalLossActive || _failsafeActive) || lostSBUS) // Generic errors: SL or FS or lost SBUS
-      _errorsCount++;
-    if (_missedFrames < UINT_MAX)
-      _missedFrames++;
-  }
-}
-
-bool SBUS::isAcceptable() {
-	if (!_gotSBUS)
-		return false;
-	if (isValid())
-		return true;
-	if (hasSBUS() && failsafeActive()) // If RX sent FailSafe, invalidate SBUS signal;
-		return false;
-  // Not isValid and not FailSafe - maybe no SBUS connection or RX Loss or RX set to No Pulses mode;
-  static bool wasMissedBefore = true;
-  if (_missedFrames >= _missedFramesLimit) {
-    if (!wasMissedBefore) {
-      _missedFramesOverflows++;
+    // Copy channels to their shadow storage;
+    for(uint8_t i = 0; i < MAX_SBUS_CHANNELS; i++) {
+      channels[i] = _channels[i];      
     }
-    wasMissedBefore = true;
-    return false;
+    _signalLostTimeMs = millis()+_recoveryTimeMs;    
+  } else {
+    if (millis() <= _signalLostTimeMs) {
+      _isValid = true; // still return previous valid frame even if last frames are missing or invalid;
+    } else {
+      if (prevValid) {
+        _errorsCount++;
+      }
+    }
   }
-  wasMissedBefore = false;
-	return true;
+  
+  interrupts();
+  return _isValid;  
 }
 
 // channels start from 1 to 18
@@ -176,9 +180,7 @@ bool SBUS::isAcceptable() {
 // returns value 988..2012 (cleanflight friendly)
 uint16_t SBUS::getChannel(uint8_t channel) { // channel is 1-based;
 	uint8_t ch = channel-1;
-	noInterrupts(); 
 	uint16_t  result = _channels[ch]; 
-	interrupts();
 	return (uint16_t) round((result-SBUS_CENTER)*SBUS_TO_CPPM_CORR+CPPM_CENTER_CORR);
 }
 
@@ -190,18 +192,16 @@ uint16_t SBUS::getRawChannel(uint8_t channel) { // channel is 1-based;
 	return result;
 }
 
-#ifdef DEBUG_SBUS
-unsigned long SBUS::getFramesCount() { 
-	noInterrupts(); 
-	unsigned long result = _framesCount; 
-	interrupts();
-	return result;
+bool SBUS::signalLossActive() { 
+  noInterrupts(); 
+  bool result = _signalLossActive; 
+  interrupts();
+  return result;
 }
 
-unsigned long SBUS::getBytesCount() { 
-	noInterrupts(); 
-	unsigned long result = _bytesCount; 
-	interrupts();
-	return result;
+bool SBUS::failsafeActive() { 
+  noInterrupts(); 
+  bool result = _failsafeActive; 
+  interrupts();
+  return result;
 }
-#endif
