@@ -1,7 +1,7 @@
 #pragma once
 
 //#define DEBUG_OLED_SPEED
-#define DEBUG_SBUS
+//#define DEBUG_SBUS
 
 //#define DEBUG
 

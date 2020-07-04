@@ -37,4 +37,6 @@ extern Seq SEQ_MODE_GOT_SBUS;
 extern bool sbusActive;
 extern int16_t channels[NUM_CHANNELS_SBUS];
 
+extern bool enableCrossfire;
+
 #endif // MENU_H

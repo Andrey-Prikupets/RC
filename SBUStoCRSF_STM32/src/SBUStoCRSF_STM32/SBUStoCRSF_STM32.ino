@@ -48,7 +48,8 @@ Beeper beeper1(BEEPER_PIN, false, PAUSE_MS(500), 5, seqs, sizeof(seqs)/sizeof(Se
 // 5  500ms   Invalid channels flashing;
 // 6  250ms   LED normal flashing;
 // 7  50ms    LED flashing no-signal; 
-TimerDelay delays[] = {200, 500, 3000, 8000, 4000, 500, 250, 50};
+// 8  1s      Reset vague SBUS stats just after begin (1 shot); 
+TimerDelay delays[] = {200, 500, 3000, 8000, 4000, 500, 250, 50, 1000};
 MultiTimer mTimer1(delays, sizeof(delays)/sizeof(TimerDelay));
 
 const uint8_t TIMER_BATTERY_LOOP         = 0; 
@@ -59,6 +60,7 @@ const uint8_t TIMER_BATTERY_MIN          = 4;
 const uint8_t TIMER_INVALID_FLASHING     = 5;
 const uint8_t TIMER_LED_VALID_FLASHING   = 6;
 const uint8_t TIMER_LED_INVALID_FLASHING = 7;
+const uint8_t TIMER_RESET_SBUS_STATS     = 8;
 
 BatteryMonitor battery1(VOLTAGE_PIN, LOW_VOLTAGE, MIN_VOLTAGE, DIVIDER, 8, 0.1);
 
@@ -239,18 +241,20 @@ void debugChannels() {
     Serial.print("SBUS: ");
     if (!sbus.isValid())
       Serial.print("NO SIG ");
-#ifdef DEBUG_SBUS
+
     Serial.print("F: ");
     Serial.print(sbus.getFramesCount(), DEC);
-    Serial.print(", B: ");
-    Serial.print(sbus.getBytesCount(), DEC);
-    Serial.print(", ");
     Serial.print(", E: ");
     Serial.print(sbus.getErrorsCount(), DEC);
+
+#ifdef DEBUG_SBUS
+    Serial.print(", B: ");
+    Serial.print(sbus.getBytesCount(), DEC);
     Serial.print(", I: ");
     Serial.print(sbus.getInvalidChannelsCount(), DEC);
-    Serial.print(", ");
 #endif        
+    Serial.print(", ");
+
   for (int i=1; i <= NUM_CHANNELS_SBUS; ++i) {
     Serial.print(i, DEC); 
     Serial.print("=");
@@ -272,15 +276,18 @@ void debugSBUSRawChannels() {
     Serial.print("SBUS RAW: ");
     if (!sbus.isValid())
       Serial.print("NO SBUS ");
-#ifdef DEBUG_SBUS
+
     Serial.print("F: ");
     Serial.print(sbus.getFramesCount(), DEC);
-    Serial.print(", B: ");
-    Serial.print(sbus.getBytesCount(), DEC);
     Serial.print(", E: ");
     Serial.print(sbus.getErrorsCount(), DEC);
-    Serial.print(", ");
+
+#ifdef DEBUG_SBUS
+    Serial.print(", B: ");
+    Serial.print(sbus.getBytesCount(), DEC);
 #endif        
+    Serial.print(", ");
+
   for (int i=1; i <= NUM_CHANNELS_SBUS; ++i) {
     Serial.print(i, DEC); 
     Serial.print("=");
@@ -361,6 +368,11 @@ void loop() {
     }
 
     menuLoop();
+
+    if (mTimer1.isTriggered(TIMER_RESET_SBUS_STATS)) {
+      sbus.resetStats();
+      mTimer1.suspend(TIMER_RESET_SBUS_STATS);
+    }
 
     resetWatchdog();
 

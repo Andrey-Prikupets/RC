@@ -95,25 +95,19 @@ void setScreenPos(uint8_t num) {
   u8g.setCursor(x, y);
 }
 
-// num = 1..(number of additional infos);
-#define setInfoPos(num) setScreenPos(NUM_CHANNELS_SBUS+num)
-
 // num = 1..NUM_CHANNELS_SBUS;
 #define setChannelPos(num) setScreenPos(num)
 
-#define INFO_FAILSAFE      1
-#define INFO_BATTERY       2
-#define INFO_VOLTAGE       3
-#define INFO_RX_STATUS     4
-#ifdef DEBUG_SBUS
-#define INFO_SBUS_FRAMES   5
-#define INFO_SBUS_ERRORS   6
-#define INFO_SBUS_INVALID_CHANNELS  7
-#define INFO_SBUS_MISSED_FRAMES  8
-#define INFO_SBUS_BYTES    8
-#endif
+#define INFO_FAILSAFE      NUM_CHANNELS_SBUS+1
+#define INFO_BATTERY       NUM_CHANNELS_SBUS+2
+#define INFO_VOLTAGE       NUM_CHANNELS_SBUS+3
+#define INFO_RX_STATUS     NUM_CHANNELS_SBUS+4
+#define INFO_SBUS_FRAMES   NUM_CHANNELS_SBUS+5
+#define INFO_SBUS_ERRORS   NUM_CHANNELS_SBUS+6
+#define INFO_SBUS_SL       NUM_CHANNELS_SBUS+7
+#define INFO_SBUS_FS       NUM_CHANNELS_SBUS+8
 #ifdef DEBUG_OLED_SPEED
-#define INFO_OLED_SPEED    8
+#define INFO_OLED_SPEED    NUM_CHANNELS_SBUS+8
 #endif
 
 void drawPos_F(uint8_t pos, unsigned int value, const __FlashStringHelper* s_P) {
@@ -149,9 +143,9 @@ void drawChannels(void) {
       itoa(i, buf+j, 10);
       buf[2]=':';
 #ifndef DEBUG_SBUS
-      int16_t x = sbus.getChannelRaw(i);
-#else
       int16_t x = channels[i-1];
+#else
+      int16_t x = sbus.getRawChannel(i);
 #endif
       if (SBUS::channelValid(x) || invalidValueFlashing) {
         itoa(x, buf+3, 10);
@@ -161,8 +155,14 @@ void drawChannels(void) {
       u8g.print(buf);      
     }  
   
-    setInfoPos(INFO_FAILSAFE);
+    setScreenPos(INFO_FAILSAFE);
     char* p = buf;
+    if (enableCrossfire) {
+      *p++ = 'C';
+      *p++ = 'R';
+      *p++ = 'S';
+      *p++ = ' ';      
+    }
     if (sbus.isValid()) {
       *p++ = 'O';
       *p++ = 'K';
@@ -181,29 +181,19 @@ void drawChannels(void) {
     u8g.print(buf);
 
 #ifdef DEBUG_SBUS
-  setInfoPos(INFO_SBUS_FRAMES);
-  u8g.print(F("Fr:"));
-  itoa(sbus.getFramesCount(), buf, 10);
-  u8g.print(buf);
-
-  setInfoPos(INFO_SBUS_ERRORS);
-  u8g.print(F("Er:"));
-  itoa(sbus.getErrorsCount(), buf, 10);
-  u8g.print(buf);
   drawPos_F (8+1, sbus.getInvalidChannelsCount(), F("In:"));
   drawPos_F (8+2, sbus.getMissedFrames(), F("Mi:"));
   drawPos_F (8+3, sbus.getOutOfSyncFrames(), F("Ou:"));
   drawPos_F (8+4, sbus.getTimeoutsCount(), F("Ti:"));
-  drawPos_F (8+5, sbus.getSignalLossFrames(), F("SL:"));
-  drawPos_F (8+6, sbus.getFailsafeFrames(), F("FS:"));
-  // drawPos_F (8+3, sbus.getBytesCount(), F("By:"));
+  drawPos_F (8+5, sbus.getBytesCount(), F("By:"));
 #endif        
-
+  drawPos_F (INFO_SBUS_FRAMES, sbus.getFramesCount(), F("Fr:"));
+  drawPos_F (INFO_SBUS_ERRORS, sbus.getErrorsCount(), F("Er:"));
+  drawPos_F (INFO_SBUS_SL, sbus.getSignalLossFrames(), F("SL:"));
 #ifdef DEBUG_OLED_SPEED
-  setInfoPos(INFO_OLED_SPEED);
-  u8g.print(F("OLED: "));
-  itoa(oledSpeed, buf, 10);
-  u8g.print(buf);
+  drawPos_F (INFO_OLED_SPEED, oledSpeed, F("OL:"));
+#else
+  drawPos_F (INFO_SBUS_FS, sbus.getFailsafeFrames(),  F("FS:"));
 #endif
 }
 
@@ -212,19 +202,19 @@ void drawScreenSaver() {
 
   drawChannels();
 
-  setInfoPos(INFO_BATTERY);
+  setScreenPos(INFO_BATTERY);
   u8g.print(F("Cells:"));      
   itoa(battery1.getNumCells(), buf, 10); // numCells = 1..9;
   buf[1] = 's';
   buf[2] = '\0';
   u8g.print(buf);      
 
-  setInfoPos(INFO_VOLTAGE);
+  setScreenPos(INFO_VOLTAGE);
   u8g.print(F("Bat:"));      
   dtostrf(battery1.getCurrVoltage(), 4, 1, buf);
   u8g.print(buf);      
 
-  setInfoPos(INFO_RX_STATUS);
+  setScreenPos(INFO_RX_STATUS);
   const __FlashStringHelper* s;
   switch (sbus_state) {
   case sbus_START: s = F("Wait RX");
