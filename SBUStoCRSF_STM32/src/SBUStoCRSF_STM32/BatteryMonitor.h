@@ -5,7 +5,7 @@
 #include "config.h"
 #include "debug.h"
 
-const float MAX_CELL_VOLTAGE = 4.2f;
+const float MAX_CELL_VOLTAGE = 4.25f;
 const float MIN_CELL_VOLTAGE = 3.0f;
 
 class BatteryMonitor

@@ -36,11 +36,11 @@ void SBUS::begin() {
 	timeoutMs = 0;
 	_serial.begin(SBUS_BAUD, SERIAL_8E2);
 	resetStats();
-	oldRx = 0;
+	_oldRx = 0;
 }
 
 void SBUS::resetStats() {
-	framesCount = _signalLossFrames = _failsafeFrames = _errorsCount = 
+	_framesCount = _signalLossFrames = _failsafeFrames = _errorsCount = 
 #ifdef DEBUG_SBUS
 		_bytesCount = _missedFrames = _outOfSyncFrames = _invalidChannelsCount = _timeoutsCount =
 #endif    
