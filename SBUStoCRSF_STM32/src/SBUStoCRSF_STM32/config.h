@@ -15,8 +15,9 @@ const float LOW_VOLTAGE = 3.47f;
 const float MIN_VOLTAGE = 3.33f;
 
 // Voltage meter correction; 
-//const float correction  = 1.045; // Fine tune it by measuring real voltage and shown voltage; correction=Vreal/Vmeasured;
-const float correction  = 1.045; // for Dmitry A.;
+//const float correction  = 1.045f; // Fine tune it by measuring real voltage and shown voltage; correction=Vreal/Vmeasured;
+//const float correction  = 1.045f; // for Dmitry A.;
+const float correction  = 0.9967f; // for Poiz;
 const float DIVIDER = (2200.0f+10000.0f)/2200.0f * correction; // Resistor divider: V+ ----| 10k |--- ADC ----| 2.2k | --- GND 
 
 // Uncomment if need 115200 baud rate instead of 400000;
