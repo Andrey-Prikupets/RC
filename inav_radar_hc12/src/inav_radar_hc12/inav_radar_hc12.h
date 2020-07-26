@@ -6,15 +6,15 @@
 #define MODE_LORA_RX     3
 #define MODE_LORA_TX     4
 
-#define LORA_NAME_LENGTH 6
+#define LORA_NAME_LENGTH 6 // was: 6
 
-#define LORA_NODES_MIN 2
+//#define LORA_NODES_MIN 2
 #define LORA_NODES_MAX 2 // was 4
 
 #define PIN_HC12_RX 10
 #define PIN_HC12_TX 11
 #define PIN_HC12_SET 12
-#define PIN_BUTTON 3
+#define PIN_BUTTON A0
 
 #define HC12_CHANNEL 101
 #define HC12_POWER 1
@@ -32,8 +32,8 @@
 #define HOST_BTFL 2
 
 char host_name[3][5]={"NoFC", "iNav", "Beta"};
-char host_state[2][5]={"", "ARM"};
-char peer_slotname[9][3]={"X", "A", "B", "C", "D", "E", "F", "G", "H"};
+//char host_state[2][5]={"", "ARM"};
+char peer_slotname[9][2]={"X", "A", "B", "C", "D", "E", "F", "G", "H"}; // was [3];
 
 struct peer_t {
    uint8_t id;
@@ -50,7 +50,7 @@ struct peer_t {
    int16_t relalt;
    msp_raw_gps_t gps;
    msp_raw_gps_t gpsrec;
-   msp_analog_t fcanalog;
+   // msp_analog_t fcanalog;
    char name[LORA_NAME_LENGTH + 1];
    };
 
@@ -62,7 +62,7 @@ struct curr_t {
     uint8_t tick;
     msp_raw_gps_t gps;
     msp_fc_version_t fcversion;
-    msp_analog_t fcanalog;
+    // msp_analog_t fcanalog;
 };
 
 struct air_type0_t { // 80 bits
@@ -78,13 +78,30 @@ struct air_type1_t { // 80 bits
     unsigned int id : 3;
     unsigned int type : 3;
     unsigned int host : 3;
-    unsigned int state : 3;
-    unsigned int broadcast : 6;
+    unsigned int state : 3; // TODO remove;
+    unsigned int broadcast : 6; // TODO remove;
     unsigned int speed : 6; // 64m/s
     char name[LORA_NAME_LENGTH]; // 6 char x 8 bits = 48
-    unsigned int temp1 : 8; // Spare
-    };
+    unsigned int temp1 : 8; // TODO remove;
+};
 
+
+/*
+// 3+25+26+14+9+3+6+2*8=102
+// 102/8=12.75
+struct air_type_t { // 102 bits
+    unsigned int id : 3;
+    signed int lat : 25; // -9 000 000 to +9 000 000    -90x10e5 to +90x10e5
+    signed int lon : 26; // -18 000 000 to +18 000 000   -180x10e5 to +180x10e5
+    signed int alt : 14; // -8192m to +8192m
+    unsigned int heading : 9; // 0 to 511°
+    unsigned int host : 3;
+    unsigned int speed : 6; // 64m/s
+    char name[LORA_NAME_LENGTH]; // 6 char x 8 bits = 48
+};
+*/
+
+/*
 struct air_type2_t { // 80 bits
     unsigned int id : 3;
     unsigned int type : 3;
@@ -94,6 +111,7 @@ struct air_type2_t { // 80 bits
     unsigned int temp1 : 20; // Spare
     unsigned int temp2 : 20; // Spare
     };
+*/
 
 struct config_t {
     uint8_t channel;
@@ -140,7 +158,7 @@ struct system_t {
     uint32_t msp_next_cycle = 0;
 
     uint8_t display_page = 0;
-    bool display_enable = 1;
+    // bool display_enable = 1;
     uint32_t display_updated = 0;
 
     bool io_button_pressed = 0;

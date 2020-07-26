@@ -44,9 +44,9 @@ peer_t peers[LORA_NODES_MAX]; // Other peers
 
 air_type0_t air_0;
 air_type1_t air_1;
-air_type2_t air_2;
+//air_type2_t air_2;
 air_type1_t * air_r1;
-air_type2_t * air_r2;
+//air_type2_t * air_r2;
 
 ButtonDebounce button(PIN_BUTTON, 250); // debounce time
 
@@ -223,7 +223,7 @@ void reset_peers() {
     for (int i = 0; i < LORA_NODES_MAX; i++) {
         peers[i].id = 0;
         peers[i].host = 0;
-        peers[i].state = 0;
+        // peers[i].state = 0;
         peers[i].lost = 0;
         peers[i].broadcast = 0;
         peers[i].lq_updated = sys.now_sec;
@@ -342,8 +342,8 @@ double gpsCourseTo(double lat1, double long1, double lat2, double long2)
 void lora_send() {
 
     if (sys.lora_tick % 8 == 0) {
-
-        if (sys.lora_tick % 16 == 0) {
+/*
+        if (sys.lora_tick % 16 == 0) { 
             air_2.id = curr.id;
             air_2.type = 2;
             air_2.vbat = curr.fcanalog.vbat; // 1 to 255 (V x 10)
@@ -351,12 +351,13 @@ void lora_send() {
             air_2.rssi = curr.fcanalog.rssi; // 0 to 1023
 
             hc12.txObj(air_2);
-        }
-        else {
+        } else 
+*/        
+        {
             air_1.id = curr.id;
             air_1.type = 1;
             air_1.host = curr.host;
-            air_1.state = curr.state;
+            // air_1.state = curr.state;
             air_1.broadcast = 0;
             air_1.speed = curr.gps.groundSpeed / 100; // From cm/s to m/s
             strncpy(air_1.name, curr.name, LORA_NAME_LENGTH);
@@ -396,13 +397,14 @@ void lora_receive() {
         air_r1 = (air_type1_t*)&air_0;
 
         peers[id].host = (*air_r1).host;
-        peers[id].state = (*air_r1).state;
+        // peers[id].state = (*air_r1).state;
         peers[id].broadcast = (*air_r1).broadcast;
         peers[id].gps.groundSpeed = (*air_r1).speed * 100; // From m/s to cm/s
         strncpy(peers[id].name, (*air_r1).name, LORA_NAME_LENGTH);
         peers[id].name[LORA_NAME_LENGTH] = 0;
 
     }
+/*    
     else if (air_0.type == 2) { // Type 2 packet (vbat mAh RSSI)
 
         air_r2 = (air_type2_t*)&air_0;
@@ -412,6 +414,7 @@ void lora_receive() {
         peers[id].fcanalog.rssi = (*air_r2).rssi;
 
     }
+*/    
     else { // Type 0 packet (GPS + heading)
 
         peers[id].gps.lat = air_0.lat * 100; // From XX.12345 to XX.1234500
@@ -636,13 +639,14 @@ void display_drawEx() {
                     drawStr (19, 12, host_name[peers[i].host]);
                 }
 
+/*
                 if (iscurrent) {
                     drawStr (50, 12, host_state[curr.state]);
                 }
                 else {
                     drawStr (50, 12, host_state[peers[i].state]);
                 }
-
+*/
                 // display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
                 if (iscurrent) {
@@ -689,7 +693,7 @@ void display_drawEx() {
                     drawVal_F (88, 44, F("D "), peers[i].distance, F("m"));
                     drawVal_F (0, 54, F("R "), peers[i].relalt, F("m"));
                 }
-
+/*
                 if (iscurrent) {
                     drawVal_F (40, 54, (float)curr.fcanalog.vbat / 10, F("v"));
                     drawVal_F (88, 54, (int)curr.fcanalog.mAhDrawn, F("mah"));
@@ -698,7 +702,7 @@ void display_drawEx() {
                     drawVal_F (40, 54, (float)peers[i].fcanalog.vbat / 10, F("v"));
                     drawVal_F (88, 54, (int)peers[i].fcanalog.mAhDrawn, F("mah"));
                 }
-
+*/
             // display.setTextAlignment (TEXT_ALIGN_RIGHT);
 
         }
@@ -709,7 +713,7 @@ void display_drawEx() {
     }
 
     sys.air_last_received_id = 0;
-    sys.message[0] = 0;
+    // sys.message[0] = 0;
     // display.display();
 }
 
@@ -734,15 +738,17 @@ void display_logo() {
 
 // -------- MSP and FC
 
+/*
 void msp_get_state() {
     uint32_t planeModes;
     msp.getActiveModes(&planeModes);
     curr.state = bitRead(planeModes, 0);
 }
+*/
 
 void msp_get_name() {
     msp.request(MSP_NAME, &curr.name, sizeof(curr.name));
-    curr.name[6] = '\0';
+    curr.name[LORA_NAME_LENGTH] = '\0'; // 6
 }
 
 void msp_get_gps() {
@@ -766,13 +772,15 @@ void msp_set_fc() {
     }
  }
 
+/*
 void msp_get_fcanalog() {
   msp.request(MSP_ANALOG, &curr.fcanalog, sizeof(curr.fcanalog));
 }
+*/
 
 void msp_send_radar(uint8_t i) {
     radarPos.id = i;
-    radarPos.state = peers[i].state;
+    radarPos.state = 0; // peers[i].state;
     radarPos.lat = peers[i].gps.lat; // x 10E7
     radarPos.lon = peers[i].gps.lon; // x 10E7
     radarPos.alt = peers[i].gps.alt * 100; // cm
@@ -904,7 +912,7 @@ void loop() {
             sys.phase = MODE_LORA_INIT;
 
         } else { // Still scanning
-            if ((sys.now > sys.display_updated + cfg.cycle_display / 2) && sys.display_enable) {
+            if ((sys.now > sys.display_updated + cfg.cycle_display / 2) ) { // && sys.display_enable
 
                 delay(50);
                 msp_set_fc();
@@ -927,7 +935,7 @@ void loop() {
 
             sys.num_peers = count_peers();
 
-            if (sys.num_peers >= LORA_NODES_MAX) { // || sys.io_button_released > 0
+            if (sys.num_peers >= LORA_NODES_MAX || sys.io_button_pressed) { // || sys.io_button_released > 0
                 sys.lora_no_tx = 1;
                 sys.display_page = 0;
             }
@@ -939,7 +947,7 @@ void loop() {
             sys.phase = MODE_LORA_SYNC;
 
         } else { // Still scanning
-            if ((sys.now > sys.display_updated + cfg.cycle_display / 2) && sys.display_enable) {
+            if ((sys.now > sys.display_updated + cfg.cycle_display / 2) ) { // && sys.display_enable
                 u8g.firstPage();
                 do  {
                   for (int i = 0; i < LORA_NODES_MAX; i++) {
@@ -1041,7 +1049,7 @@ void loop() {
 
 // ---------------------- DISPLAY
 
-    if ((sys.now > sys.display_updated + cfg.cycle_display) && sys.display_enable && (sys.phase > MODE_LORA_SYNC)) {
+    if ((sys.now > sys.display_updated + cfg.cycle_display) && (sys.phase > MODE_LORA_SYNC)) { // && sys.display_enable 
 
         stats.timer_begin = millis();
         display_draw();
@@ -1055,6 +1063,7 @@ void loop() {
 
         stats.timer_begin = millis();
 
+/* removed to save space;
         if (sys.lora_slot == 0) {
 
             if (sys.lora_tick % 6 == 0) {
@@ -1066,7 +1075,7 @@ void loop() {
             }
 
         }
-
+*/
         msp_get_gps(); // GPS > FC > ESP
         msp_send_peer(sys.lora_slot); // ESP > FC > OSD
 
@@ -1116,6 +1125,7 @@ void loop() {
 
         // Screen management
 
+/*
         if (!curr.state && !sys.display_enable) { // Aircraft is disarmed = Turning on the OLED
             // display.displayOn();
             sys.display_enable = 1;
@@ -1125,7 +1135,7 @@ void loop() {
             // display.displayOff();
             sys.display_enable = 0;
         }
-
+*/
     sys.stats_updated = sys.now;
     }
 

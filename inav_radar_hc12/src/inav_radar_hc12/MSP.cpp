@@ -263,6 +263,7 @@ bool MSP::command2(uint16_t messageID, void * payload, uint8_t size, bool waitAC
   return true;
 }
 
+/*
 // map MSP_MODE_xxx to box ids
 // mixed values from cleanflight and inav
 static const uint8_t BOXIDS[30] PROGMEM = {
@@ -328,3 +329,4 @@ bool MSP::getActiveModes(uint32_t * activeModes)
 
   return false;
 }
+*/
