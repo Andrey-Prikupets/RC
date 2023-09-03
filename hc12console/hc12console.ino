@@ -200,7 +200,11 @@ void setup(void) {
   }
 }
 
+ char x[1600]; 
+
 void loop(void) {
+  x[0] = 0;
+  
   bool completed = false;
   while (HC12.available() && buf_pos < MAX_PACKET_LEN && !completed) {
     char ch = HC12.read();

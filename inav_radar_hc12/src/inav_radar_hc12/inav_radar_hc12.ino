@@ -22,15 +22,20 @@ SerialTransfer hc12;
 
 #define FPSTR(pstr_pointer) (reinterpret_cast<const __FlashStringHelper *>(pstr_pointer))
 
+///#define DISPLAY
+
+#ifdef DISPLAY
 // Display selection; Note: after changing display may need to re-design menu;
 U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g(U8G2_R0); // hardware // F - fastest, 1 - slowest, 2 - medium;
-
-// -------- VARS
 
 uint8_t char_height;
 uint8_t char_width;
 uint8_t screen_width;
 uint8_t screen_height;
+#endif
+
+// -------- VARS
+
 
 config_t cfg;
 system_t sys;
@@ -52,6 +57,7 @@ ButtonDebounce button(PIN_BUTTON, 250); // debounce time
 
 // -------- DISPLAY
 
+#ifdef DISPLAY
 // PROGMEM enabled draw functions -----------------------
 size_t getLength_F(const __FlashStringHelper *ifsh)
 {
@@ -161,6 +167,7 @@ void drawProgressBar(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t pr
   u8g.drawFrame(x,y,w,h);  
   u8g.drawBox(x+1,y+1,(int) ((w-2)*progress+50)/100, h-2);  
 }
+#endif
 
 // -------- HC12
 
@@ -219,7 +226,16 @@ int count_peers(bool active = 0) {
 }
 
 void reset_peers() {
+        Serial.print("i=");
+        Serial.print(i, DEC);
+        Serial.print(", name=");
+        Serial.flush();
+        uint16_t a = peers[0].id;
+        Serial.println(a, HEX);
+        Serial.flush();
+
     sys.now_sec = millis();
+/*
     for (int i = 0; i < LORA_NODES_MAX; i++) {
         peers[i].id = 0;
         peers[i].host = 0;
@@ -233,8 +249,10 @@ void reset_peers() {
         peers[i].distance = 0;
         peers[i].direction = 0;
         peers[i].relalt = 0;
-        strcpy(peers[i].name, "");
+        //strcpy(peers[i].name, ""); // ERROR: hangs;
+        peers[i].name[0] = 0;
     }
+*/
 }
 
 // Select first free peer and assign its number+1 as curr.id;
@@ -450,9 +468,9 @@ void lora_init() {
 
 // ----------------------------------------------------------------------------- Display
 
+#ifdef DISPLAY
 void display_init() {
   u8g.begin();
-
   u8g.setFont(DISPLAY_FONT); // u8g_font_6x10
   u8g.setFontRefHeightText();
   u8g.setFontPosTop();
@@ -735,6 +753,7 @@ void display_logo() {
   
   delay(1200);
 }
+#endif
 
 // -------- MSP and FC
 
@@ -809,6 +828,7 @@ void msp_send_peer(uint8_t peer_id) {
 
 void buttonChanged(int state){
     sys.io_button_pressed = !state;
+#ifdef DISPLAY    
     if (sys.io_button_pressed == 1) {
 
         if (sys.display_page >= 3 + LORA_NODES_MAX) {
@@ -821,27 +841,33 @@ void buttonChanged(int state){
             sys.display_page++;
         }
     }
+#endif    
 }
 
 // ----------------------------- setup
 
 void setup() {
+    pinMode(PIN_LED, OUTPUT);
+    digitalWrite(PIN_LED, HIGH);
+
     button.setCallback(buttonChanged);
     
     set_mode();
+
+#ifdef DISPLAY    
+    display_init();
+    display_logo();
+#endif    
 
     pinMode(PIN_HC12_SET, OUTPUT);
     digitalWrite(PIN_HC12_SET, HIGH); // 1=data mode; 0=AT commands mode;
     HC12.begin(HC12_BAUD_RATE);
     hc12.begin(HC12);
 
-    display_init();
-    display_logo();
-
     lora_init();
-
-    msp.begin(Serial);
+    
     Serial.begin(MSP_BAUD_RATE);
+    msp.begin(Serial);
 
     reset_peers();
 
@@ -853,12 +879,31 @@ void setup() {
 
     sys.io_led_blink = 0;
 
-    pinMode(PIN_LED, OUTPUT);
-    digitalWrite(PIN_LED, HIGH);
-
     curr.host = HOST_NONE;
 
     sys.phase = MODE_HOST_SCAN;
+
+// ------------
+    u8g.begin();
+    u8g.setFont(u8g_font_5x8); // u8g_font_6x10
+    u8g.setFontRefHeightText();
+    u8g.setFontPosTop();
+    u8g.setDrawColor(1);
+  
+    int i=0; 
+    for (;;) {
+      button.update();
+      u8g.firstPage();
+      do  {
+        drawVal_F(0, 0, F("Counter="), i);
+        drawVal_F(0, 10, F("Button="), sys.io_button_pressed);
+        drawVal_F(0, 20, F("Time="), millis(), F(" ms"));
+      } while( u8g.nextPage() );
+      i++;
+      digitalWrite(PIN_LED, i & 1);
+      delay(200);
+    }
+// ---------
 }
 
 // ----------------------------------------------------------------------------- MAIN LOOP
@@ -867,6 +912,7 @@ void loop() {
     button.update();
     
     sys.now = millis();
+#ifdef LOOP  
 
 // ---------------------- HOST SCAN
 
@@ -1052,7 +1098,9 @@ void loop() {
     if ((sys.now > sys.display_updated + cfg.cycle_display) && (sys.phase > MODE_LORA_SYNC)) { // && sys.display_enable 
 
         stats.timer_begin = millis();
+#ifdef DISPLAY        
         display_draw();
+#endif
         stats.last_oled_duration = millis() - stats.timer_begin;
         sys.display_updated = sys.now;
     }
@@ -1171,5 +1219,5 @@ void loop() {
     if(hc12.available()) {
         lora_receive();
     }
-
+#endif
 }
